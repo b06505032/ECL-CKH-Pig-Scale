@@ -220,7 +220,7 @@ class ScaleView(tk.Frame):
         self.weight_var.set(0.0)
 
     
-    # show the weight in GUI
+    # show the weight on GUI
     def weight_frame(self):
         weightFrame = tk.Frame(self, bd=1, padx=10, pady=10, relief=RAISED)
         
@@ -262,7 +262,7 @@ class ScaleView(tk.Frame):
         weightFrame.pack(side=LEFT)
 
 
-    # function for changing color when the user click on the inout of data frame
+    # function for changing color when the user click on the input of data frame
     def change_color(self, event): #點擊widget時，改變其顏色 
         widget = self.dataFrame.focus_get()
         if self.en_sow['fg']=="red" and str(widget) == ".!labelframe2.!entry":
