@@ -18,6 +18,10 @@
 $ python3 main.py
 ```
 
+## Reference
+- The [Document](https://hackmd.io/@gcAQO6FETE6ZHMRzgzc67A/S1PPtG6MO) you may have to read
+
+
 ## Repo Structure
 ```
 .
