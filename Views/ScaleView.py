@@ -35,6 +35,7 @@ class ScaleView(tk.Frame):
         self.read_data()
 
 
+    # function for getting the data from queue of the serial and calculate the pig's weight
     def read_data(self):  #讀取資料
         value = True
         while self.system.dataQueue.qsize():
@@ -95,38 +96,37 @@ class ScaleView(tk.Frame):
                             temp_list = self.system.fence_list[-1].piglet_list[-1].weight_list[index:index+self.system.sampleSize]
                             time_list = self.system.fence_list[-1].piglet_list[-1].time_list[index:index+self.system.sampleSize]
                             self.system.fence_list[-1].piglet_list[-1].index += 1
+                            # pass the temp_list and time_list into kpss_test function to check if it is stationary or not
                             ser_data = pd.Series(temp_list, index=time_list)
-                            self.system.fence_list[-1].piglet_list[-1].kptest.append(1 if kpss_test(ser_data) else 0)
+                            self.system.fence_list[-1].piglet_list[-1].kptest.append(1 if kpss_test(ser_data) else 0)  # record the kpss return value
                             if len(self.system.fence_list[-1].piglet_list[-1].kptest) < 5:
-                                continue
+                                continue  # less than five times
                             if self.system.fence_list[-1].piglet_list[-1].kptest[-5:] != [1]*5:
-                                continue  # not stationary
-                            # stationary -> calculate the average
+                                continue  # the latest five value is not stationary
+                            # is stationary! -> calculate the average
                             temp_list = self.system.fence_list[-1].piglet_list[-1].weight_list[index-4:index+self.system.sampleSize]
-                            time_list = self.system.fence_list[-1].piglet_list[-1].time_list[index-4:index+self.system.sampleSize]
-                            ser_data = pd.Series(temp_list, index=time_list)
-                            temp_list = [round(i-self.totalWeight, 2) for i in temp_list]
-                            last_ave = round(np.mean(temp_list), 2)
-                            self.system.fence_list[-1].piglet_list[-1].weight = last_ave
-                            self.totalWeight += last_ave
-                            self.system.fence_list[-1].weight = self.totalWeight
+                            temp_list = [round(i-self.totalWeight, 2) for i in temp_list]  # minus the former totalWeight to get actual weight
+                            last_ave = round(np.mean(temp_list), 2)  # get the average
+                            self.system.fence_list[-1].piglet_list[-1].weight = last_ave  # record the pig weight actual value
+                            self.totalWeight += last_ave  # renew totalWeight
+                            self.system.fence_list[-1].weight = self.totalWeight  # record the fence weight
 
 
                             # 儲存豬耳號
                             temp_ID=[self.input_sow_id.get() ,self.input_piglet_id.get()]
-                            self.system.fence_list[-1].pig_id.append(temp_ID)
-                            self.tree.insert("","end",values=[self.input_piglet_id.get(), str(last_ave)])
-                            self.update_minmax(last_ave)    
+                            self.system.fence_list[-1].pig_id.append(temp_ID)  # record ID
+                            self.tree.insert("","end",values=[self.input_piglet_id.get(), str(last_ave)])  # add pigID and weight in the table
+                            self.update_minmax(last_ave)  # update the min and max value
                             # claculate pig number
                             if self.system.fence_list[-1].piglet_list is not []:
                                 self.piglet_save_num.set("已存豬數："+str(len(self.system.fence_list[-1].piglet_list)))
                                 self.system.fence_list[-1].piglet_num = len(self.system.fence_list[-1].piglet_list)
-                            # show information
+                            # show information on GUI
                             self.piglet_weight.set(str(round(self.system.fence_list[-1].piglet_list[-1].weight,2))+"kg")
                             self.pig_weight_show.configure(bg="white",fg="black")
                             self.en_piglet.configure(font=("Calibri",26),width=10, fg="red")
                             self.input_piglet_id.set("請輸入耳號")
-                            # create a new pig
+                            # create a new pig, be ready to weight the next pig
                             p = Pig()
                             self.system.fence_list[-1].piglet_list.append(p)   
             except queue.Empty:
@@ -134,6 +134,7 @@ class ScaleView(tk.Frame):
         self.weight_value_show = self.label_weighing_nowshow.after(100, self.read_data)
 
 
+    # function for removing the value in the GUI table
     def clear_table(self):
         self.tree.delete(*self.tree.get_children())
         self.min_max.delete(*self.min_max.get_children())
@@ -142,6 +143,7 @@ class ScaleView(tk.Frame):
         self.min_max.insert("","end",values=[self.min_var.get(), self.max_var.get()])
 
 
+    # command for pressing stop weighting button
     def stop_weighting(self):
         self.label_weighing_nowshow.after_cancel(self.weight_value_show)
         self.system.serialthread.ser.reset_input_buffer()
@@ -159,6 +161,7 @@ class ScaleView(tk.Frame):
         self.output_csv()
 
 
+    # function for updating the min and max value in the GUI table
     def update_minmax(self, value):
         if value < self.min_var.get():
             self.min_max.delete(*self.min_max.get_children())
@@ -170,6 +173,7 @@ class ScaleView(tk.Frame):
             self.min_max.insert("","end",values=[self.min_var.get(), self.max_var.get()])
 
     
+    # function for stopping the thread when user presses stopping weighting button
     def _async_raise(self, tid, exctype):
         """raises the exception, performs cleanup if needed"""
         tid = ctypes.c_long(tid)
@@ -183,6 +187,7 @@ class ScaleView(tk.Frame):
             raise SystemError("PyThreadState_SetAsyncExc failed")
 
 
+    # function for outputing the csv file when user presses stoping weighting button
     def output_csv(self):
         file_path = getcwd() #取路徑的資料
         with open(file_path + "/" + today() + "weaned weight" +'.csv','a+',encoding="utf-8",newline='') as csv_file:
@@ -204,15 +209,18 @@ class ScaleView(tk.Frame):
             print("===OUTPUT CSV DEBUG PART===")
 
 
+    # command for pressing the decide weight button
     def decide_weight(self):
         self.btn_decide_weight.focus_set()
 
-    
+
+    # command for zeroing the scale
     def zeroing(self):
         self.system.serialthread.write_data("MZ\r\n")
         self.weight_var.set(0.0)
 
     
+    # show the weight in GUI
     def weight_frame(self):
         weightFrame = tk.Frame(self, bd=1, padx=10, pady=10, relief=RAISED)
         
@@ -254,6 +262,7 @@ class ScaleView(tk.Frame):
         weightFrame.pack(side=LEFT)
 
 
+    # function for changing color when the user click on the inout of data frame
     def change_color(self, event): #點擊widget時，改變其顏色 
         widget = self.dataFrame.focus_get()
         if self.en_sow['fg']=="red" and str(widget) == ".!labelframe2.!entry":
@@ -264,6 +273,7 @@ class ScaleView(tk.Frame):
             self.en_piglet.configure(font=("Calibri",33),width=8, fg="black")
 
 
+    # a frame that allows the user to input sowID and pigletID
     def data_frame(self):
         self.dataFrame = ttk.LabelFrame(self, text="耳號設定", relief=RIDGE)
         
@@ -283,6 +293,7 @@ class ScaleView(tk.Frame):
         self.dataFrame.pack(side=LEFT)
 
 
+    # a frame that shows the table on GUI
     def table_frame(self):
         tableFrame = tk.Frame(self, bd=1, padx=10, pady=10, relief=RIDGE)
         

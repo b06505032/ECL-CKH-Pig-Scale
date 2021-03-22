@@ -3,14 +3,14 @@ from Structure.SerialThread import *
 
 class Pig():
     def __init__(self):
-        self.weight_list = []
-        self.real_weight_list = []
-        self.std_weight_list = []
-        self.weight = 0.0
-        self.std_err = 0.0
-        self.time_list = []
-        self.kptest = []
-        self.index = 0
+        self.weight = 0.0  # store the weight of the pig after calculating
+        self.weight_list = []  # store the measure weights
+        self.real_weight_list = []  # store the real weights
+        self.std_weight_list = []  # store the weights after filter out the outliers 
+        self.std_err = 0.0  # store the standard error of the weight_list
+        self.time_list = []  # store the corresponging time
+        self.kptest = []  # record the return value of the function kpss_test()
+        self.index = 0  # indexing which part of the weight_list passing into the function kpss_test()
 
 
 class Fence():

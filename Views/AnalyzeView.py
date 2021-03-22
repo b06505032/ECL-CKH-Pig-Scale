@@ -49,31 +49,26 @@ class AnalyzeView(tk.Frame):
 
     def analyze_data1(self):
         print(f'analyze method 1 取{self.system.sampleSize}筆data, 直接算平均')
-        # analyze_data1(self.system.threshold, self.system.sampleSize, self.weight_values, self.storage_path_var.get(), self.data_filename)
         analyze_data1(self.system.threshold, self.system.sampleSize, self.weight_values, getcwd(), self.data_filename)
         
     
     def analyze_data2(self):
         print(f'analyze method 2 取{self.system.sampleSize}筆data, 前 n比不計, 算平均')
-        # analyze_data2(self.system.threshold, self.system.sampleSize, self.weight_values, self.storage_path_var.get(), self.data_filename)
         analyze_data2(self.system.threshold, self.system.sampleSize, self.weight_values, getcwd(), self.data_filename)
 
 
     def analyze_data3(self):
         print(f'analyze method 3 取{self.system.sampleSize}筆data, 刪除離群值, 算平均')
-        # analyze_data3(self.system.threshold, self.system.sampleSize, self.weight_values, self.storage_path_var.get(), self.data_filename)
         analyze_data3(self.system.threshold, self.system.sampleSize, self.weight_values, getcwd(), self.data_filename)
     
 
     def analyze_data4(self):
         print(f'analyze method 4 取{self.system.sampleSize}筆data, 前 n比不計, 刪除離群值, 算平均')
-        # analyze_data4(self.system.threshold, self.system.sampleSize, self.weight_values, self.storage_path_var.get(), self.data_filename)
         analyze_data4(self.system.threshold, self.system.sampleSize, self.weight_values, getcwd(), self.data_filename)
 
 
     def analyze_data5(self):
         print(f'analyze method 5 利用滑動窗口，判斷數據穩定後，算平均')
-        # analyze_data5(self.system.threshold, self.system.sampleSize, self.weight_values, self.time_values, self.storage_path_var.get(), self.data_filename)
         analyze_data5(self.system.threshold, self.system.sampleSize, self.weight_values, self.time_values, getcwd(), self.data_filename)
 
 
