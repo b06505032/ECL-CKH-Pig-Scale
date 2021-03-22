@@ -41,6 +41,7 @@ class PigGUI(tk.Tk):
         self.fence_list = []
         self.last_ave = 0.0
         self.datetime_list = []
+        self.pig_id_list = []
         self.record_history("initializie!")
 
 
@@ -84,7 +85,10 @@ class PigGUI(tk.Tk):
         btn_set4 = tk.Button(frm_1,text="設定資料儲存路徑",command=self.select_folder).grid(row=1,column=1)
         self.btn_connect = tk.Button(frm_1,command=self.connecting,text="連線")
         self.btn_connect.grid(row=0,column=2)
-        btn_weighing = tk.Button(frm_1,text="開始秤重", command=self.weighing).grid(row=1,column=2)
+        btn_weighing = tk.Button(frm_1,text="秤重(平均)", command=self.weighing).grid(row=3,column=0)
+        btn_weighing = tk.Button(frm_1,text="秤重(眾數)").grid(row=3,column=1)
+        btn_weighing = tk.Button(frm_1,text="秤重(after平均)").grid(row=4,column=0)
+        btn_weighing = tk.Button(frm_1,text="秤重(標準差)").grid(row=4,column=1)
         
         port_list = list(serial.tools.list_ports.comports())
         assert (len(port_list) != 0),"无可用串口"
@@ -112,17 +116,17 @@ class PigGUI(tk.Tk):
         frm_2_up.pack(side='top')
         frm_2_down.pack(side='bottom')
 
-        self.swine_id, self.pig_id = tk.StringVar(), tk.StringVar()
-        self.swine_id.set("")
+        self.sow_id, self.pig_id = tk.StringVar(), tk.StringVar()
+        self.sow_id.set("")
         self.pig_id.set("")
 
         lb_sow =  tk.Label(frm_2_up,text="母豬資料")
         lb_sow.grid(row=0,column=0)
         lb_smallpig = tk.Label(frm_2_up,text="仔豬資料")
         lb_smallpig.grid(row=0,column=1)
-        en_sow = tk.Entry(frm_2_up)
+        en_sow = tk.Entry(frm_2_up, textvariable = self.sow_id)
         en_sow.grid(row=1,column=0)
-        en_smallpig = tk.Entry(frm_2_up)
+        en_smallpig = tk.Entry(frm_2_up, textvariable = self.pig_id)
         en_smallpig.grid(row=1,column=1)
         btn_zero = tk.Button(frm_2_down,text="歸零", command = self.zeroing)
         btn_zero.grid(row=0,column=0)
@@ -252,15 +256,18 @@ class PigGUI(tk.Tk):
 
         with open(file_path + "/" + self.today() + "weaned weight" +'.csv','a+') as csv_file:
             write = csv.writer(csv_file)
+            header = ["pig id", "time", "weight", "raw data"]
+            write.writerow(header)
             for j in range(len(self.fence_list)-1):
-                temp = ["Fence "+str(j+1),self.fence_list[j].weight]
-                write.writerow(temp)
+                i = len(self.fence_list[j].piglet_list)-1
+                k = i*j
                 for i in range(len(self.fence_list[j].piglet_list)-1):
-                    temp1 = ["","Pig "+str(i+1)]
-                    temp1.append(self.fence_list[j].piglet_list[i].weight)
-                    temp1.append("raw data")
-                    temp1.extend(self.fence_list[j].piglet_list[i].weight_list)
-                    write.writerow(temp1)
+                    temp = [self.pig_id_list[k], self.time(),self.fence_list[j].piglet_list[i].weight]
+                    temp.extend(self.fence_list[j].piglet_list[i].weight_list)
+                    write.writerow(temp)
+                    k = k + 1
+                temp1 = ["", "", "total", self.fence_list[j].weight]
+                write.writerow(temp1)
 
 
 
@@ -295,7 +302,7 @@ class PigGUI(tk.Tk):
             # read current data
             data_raw = self.myserial.ser.readline()  # 讀取一行
             data = data_raw.decode("utf-8")   # 用預設的UTF-8解碼
-            # print('original data:', data_raw)
+            print('original data:', data_raw)
             data = data.strip("ST,GS,").strip("US,GS,").strip("ST,NT,").strip("ST,TR,").strip("OL,GS")
             data = data.strip().strip("kg").replace(" ", "")
             if data == "MZ":
@@ -336,6 +343,12 @@ class PigGUI(tk.Tk):
                 print("average weight:", round(self.last_ave, 2))
                 self.fence_list[-1].weight = self.total_weight_var.get()
 
+                #儲存豬耳號
+                id_list = [self.sow_id.get(),self.pig_id.get()]
+                self.pig_id_list.append(id_list)
+                print(self.pig_id_list)
+
+
                 # claculate pig number
                 if self.fence_list[-1].piglet_list is not []:
                     self.piglet_save_num.set(len(self.fence_list[-1].piglet_list))
@@ -367,7 +380,7 @@ class PigGUI(tk.Tk):
                     print("No.", i+1, "pig weight:", self.fence_list[j].piglet_list[i].weight_list)
             ##########  Debugging Part  ##########
 
-            self.label_weighing_nowshow.after(100,self.read_data)
+            self.label_weighing_nowshow.after(500,self.read_data)
         else:
             print("serial is not open")
             tk.messagebox.showwarning(title="錯誤",message='尚未連線')
@@ -440,7 +453,7 @@ class Fence():
     def __init__(self):
         self.piglet_num = 0
         self.weight = 0
-        self.swine = ""
+        self.sow = ""
         self.piglet_list = []
         p = Pig()
         self.piglet_list.append(p)
