@@ -10,12 +10,66 @@ from tkinter import simpledialog as sd
 from tkinter import filedialog as fd
 from tkinter import *
 from datetime import datetime
-
 import serial
 import serial.tools.list_ports
 from statistics import mean
 import csv
+import xlrd
+import logging
+from prettytable import PrettyTable
+import numpy as np
+import os
 
+
+def time():
+    now = datetime.now()
+    now_time = str(now.hour) + "-" + str(now.minute) + "-" + str(now.second)
+    return now_time
+
+def today():
+    now = datetime.now()
+    if len(str(now.month)) == 1:
+        month = "0" + str(now.month)
+    else:
+        month = str(now.month)
+    if len(str(now.day)) == 1:
+        day = "0" + str(now.day)
+    else:
+        day = str(now.day)
+    today = month + day
+    return today
+
+
+# set up logging to file - see previous section for more details
+logging.basicConfig(level=logging.DEBUG,
+                    # format='%(asctime)s %(name)-4s %(message)s',
+                    format='%(asctime)s %(message)s',
+                    datefmt='%m-%d %H:%M',
+                    filename='terminal'+today()+'_'+time()+'.log',
+                    filemode='w')
+# define a Handler which writes INFO messages or higher to the sys.stderr
+console = logging.StreamHandler()
+console.setLevel(logging.DEBUG)
+# set a format which is simpler for console use
+formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+# tell the handler to use this format
+console.setFormatter(formatter)
+# add the handler to the root logger
+logging.getLogger('').addHandler(console)
+# Now, we can log to the root logger, or any other logger. First the root...
+logging.info('Start logging...')
+# Now, define a couple of other loggers which might represent areas in your
+# application:
+logger = logging.getLogger('info')
+
+
+def print(_str):
+    logger.debug(_str)
+
+
+def list_to_str(org_list):
+    full_str = ', '.join([str(elem) for elem in org_list])
+    return full_str
 
 
 class PigGUI(tk.Tk):
@@ -40,9 +94,9 @@ class PigGUI(tk.Tk):
         self.data_list = [0.0]
         self.fence_list = []
         self.last_ave = 0.0
-        self.datetime_list = []
+        # self.datetime_list = []
         self.pig_id_list = []
-        self.record_history("initializie!")
+        self.record_history("完成初始化")
 
 
     def select_folder(self):
@@ -59,15 +113,14 @@ class PigGUI(tk.Tk):
     def select_file(self):
         filename =  fd.askopenfilename(initialdir = "/",title = "Select file",filetypes = (("csv files","*.csv"),("all files","*.*")))
         if filename is not None:
-            print(type(filename))
+            print(str(type(filename)))
             with open(filename, newline='') as csvfile:
                 rows = csv.reader(csvfile, delimiter=',')
                 for row in rows:
                     # print(type(row))
-                    print(row[0],row[1])
+                    print(str(row[0]) +" "+str(row[1]))
         self.record_history("成功上傳豬隻耳號資料")
          
-
 
     def record_history(self, _record_str):
         self.record_list.append(_record_str)
@@ -75,6 +128,7 @@ class PigGUI(tk.Tk):
         self.text_history.insert(tk.END, _record_str+"\n")
         self.text_history.yview_pickplace("end")
         self.text_history.configure(state='disabled')
+
 
     def setting_frame(self):
         frm_1 = tk.Frame(self)
@@ -85,10 +139,8 @@ class PigGUI(tk.Tk):
         btn_set4 = tk.Button(frm_1,text="設定資料儲存路徑",command=self.select_folder).grid(row=1,column=1)
         self.btn_connect = tk.Button(frm_1,command=self.connecting,text="連線")
         self.btn_connect.grid(row=0,column=2)
-        btn_weighing = tk.Button(frm_1,text="秤重(平均)", command=self.weighing).grid(row=3,column=0)
-        btn_weighing = tk.Button(frm_1,text="秤重(眾數)").grid(row=3,column=1)
-        btn_weighing = tk.Button(frm_1,text="秤重(after平均)").grid(row=4,column=0)
-        btn_weighing = tk.Button(frm_1,text="秤重(標準差)").grid(row=4,column=1)
+        self.btn_weighing = tk.Button(frm_1,command=self.weighing,text="開始秤重")
+        self.btn_weighing.grid(row=1,column=2)
         
         port_list = list(serial.tools.list_ports.comports())
         assert (len(port_list) != 0),"无可用串口"
@@ -97,7 +149,7 @@ class PigGUI(tk.Tk):
         for i in range(len(port_list)):
             # 将串口号切割出来
             lines = str(port_list[i])
-            print("port:", i, str(port_list[i]))
+            print("port: " + str(i) + " " + str(port_list[i]))
             str_list = lines.split(" ")
             port_str_list.append(str_list[0])
         self.port_var = tk.StringVar()
@@ -117,8 +169,8 @@ class PigGUI(tk.Tk):
         frm_2_down.pack(side='bottom')
 
         self.sow_id, self.pig_id = tk.StringVar(), tk.StringVar()
-        self.sow_id.set("")
-        self.pig_id.set("")
+        self.sow_id.set("default")
+        self.pig_id.set("default")
 
         lb_sow =  tk.Label(frm_2_up,text="母豬資料")
         lb_sow.grid(row=0,column=0)
@@ -132,6 +184,17 @@ class PigGUI(tk.Tk):
         btn_zero.grid(row=0,column=0)
         btn_clean = tk.Button(frm_2_down,text="清除上筆")
         btn_clean.grid(row=0,column=1)
+        
+        
+        btn_get_record_data = tk.Button(frm_2_down,text="取得歷史測試資料", command=self.get_record_file)
+        btn_get_record_data.grid(row=1,column=0)
+        btn_get_record_data = tk.Button(frm_2_down,text="分析歷史測試資料1", command=self.analyze_data1)
+        btn_get_record_data.grid(row=2,column=0)
+        btn_get_record_data = tk.Button(frm_2_down,text="分析歷史測試資料2", command=self.analyze_data2)
+        btn_get_record_data.grid(row=2,column=1)
+        btn_get_record_data = tk.Button(frm_2_down,text="分析歷史測試資料3", command=self.analyze_data3)
+        btn_get_record_data.grid(row=2,column=2)
+
 
     def weight_frame(self):
         frm_3 = tk.Frame(self)
@@ -181,14 +244,14 @@ class PigGUI(tk.Tk):
         r5 = tk.Label(setting_context, text="紀錄路徑:").grid(row=4, column=0)
         r6 = tk.Label(setting_context, text="秤電量:").grid(row=5, column=0)
 
-        setting_entry = tk.LabelFrame(frm_4,padx=5, pady=5)
+        setting_entry = tk.LabelFrame(frm_4,padx=20, pady=5)
         setting_entry.grid(row=1, column=1)
         
         self.status_var, self.save_var, self.total_weight_var, self.storage_path_var = tk.StringVar(), tk.DoubleVar(), tk.DoubleVar(), tk.StringVar()
         self.status_var.set("disconnect")
         self.save_var.set(0.0) # 初始值0
         self.total_weight_var.set(0.0)
-        self.storage_path_var.set("請選擇資料儲存路徑")
+        self.storage_path_var.set(os.getcwd())
         setting1 = tk.Label(setting_entry,width=10,textvariable=self.status_var).grid(row=0, column=0)
         setting2 = tk.Label(setting_entry,width=10,textvariable=self.save_var).grid(row=1, column=0)
         setting3 = tk.Label(setting_entry,width=10,textvariable=self.total_weight_var).grid(row=2, column=0)
@@ -212,7 +275,6 @@ class PigGUI(tk.Tk):
         optimized_image = optimized_canvas.create_window(0, 0, anchor=NW, window=self.text_history)
 
 
-
     def zeroing(self):
         self.myserial.write_data("MZ\r\n")
         
@@ -223,7 +285,7 @@ class PigGUI(tk.Tk):
             self.myserial.open_port(temp)
             self.zeroing()
             self.status_var.set("connect")
-            self.record_history("connect")
+            self.record_history("連線")
             self.btn_connect.configure(text="中斷連線",command=self.disconnect)
         except:
             tk.messagebox.showwarning(title="錯誤",message='請選擇串口埠')
@@ -231,38 +293,45 @@ class PigGUI(tk.Tk):
 
     def disconnect(self):
         self.myserial.ser.close()
-        self.record_history("disconnect!")
+        self.record_history("中斷連線")
         self.status_var.set("disconnect")
+        self.datafile.close()
         self.btn_connect.configure(text="連線",command=self.connecting)
     
     def weighing(self):
         # start reading
         try:
+            self.datafile = open(today()+'_'+time()+self.sow_id.get()+'.log',"w")
             # create a new fence
             f = Fence()
             self.fence_list.append(f)
             self.label_weighing_nowshow.after(0, self.read_data)
+            self.record_history("開始秤重")
+            self.btn_weighing.configure(text = "結束並儲存",command=self.stop_weighing)
         except AttributeError:
             print("serial is not open!!!!!!!!!!!!")
             tk.messagebox.showwarning(title="錯誤",message='尚未連線!!!!!!!!')
 
+    def stop_weighing(self):
+        self.label_weighing_nowshow.after_cancel(self.weight_value_show)
+        self.record_history("停止秤重")
+        self.btn_weighing.configure(text = "開始秤重",command=self.weighing)
+        self.output_csv()
+        self.datafile.close()
+
 
     def output_csv(self):
         file_path = self.storage_path_var.get()
-        with open(file_path + "/" + self.today() + "raw data" +'.csv','a+') as log_file:
-            logfile = csv.writer(log_file)
-            logfile.writerow(self.data_list)
-            logfile.writerow(self.datetime_list)
 
-        with open(file_path + "/" + self.today() + "weaned weight" +'.csv','a+') as csv_file:
+        with open(file_path + "/" + today() + "weaned weight" +'.csv','a+') as csv_file:
             write = csv.writer(csv_file)
-            header = ["pig id", "time", "weight", "raw data"]
+            header = ["pig id", "weight", "raw data"]
             write.writerow(header)
             for j in range(len(self.fence_list)-1):
                 i = len(self.fence_list[j].piglet_list)-1
                 k = i*j
                 for i in range(len(self.fence_list[j].piglet_list)-1):
-                    temp = [self.pig_id_list[k], self.time(),self.fence_list[j].piglet_list[i].weight]
+                    temp = [self.pig_id_list[k],self.fence_list[j].piglet_list[i].weight]
                     temp.extend(self.fence_list[j].piglet_list[i].weight_list)
                     write.writerow(temp)
                     k = k + 1
@@ -271,121 +340,340 @@ class PigGUI(tk.Tk):
 
 
 
-
-    def time(self):
-        now = datetime.now()
-        now_time = str(now.hour) + ":" + str(now.minute) + ":" + str(now.second)
-        return now_time
-
-    def today(self):
-        now = datetime.now()
-        if len(str(now.month)) == 1:
-            month = "0" + str(now.month)
-        else:
-            month = str(now.month)
-        
-        if len(str(now.day)) == 1:
-            day = "0" + str(now.day)
-        else:
-            day = str(now.day)
-        today = str(now.year) +  month + day
-        return today
-
-   
-
     def read_data(self):  #讀取資料
         if self.myserial.ser.is_open == True:
             # get last data
             last_data = self.data_list[-1]
-            # print("last data:",last_data)
             
             # read current data
+            self.myserial.write_data("RW\r\n")
             data_raw = self.myserial.ser.readline()  # 讀取一行
             data = data_raw.decode("utf-8")   # 用預設的UTF-8解碼
-            print('original data:', data_raw)
+            print("original data: "+ str(data_raw))
+            
             data = data.strip("ST,GS,").strip("US,GS,").strip("ST,NT,").strip("ST,TR,").strip("OL,GS")
             data = data.strip().strip("kg").replace(" ", "")
             if data == "MZ":
                 data = 0.0
-            data = float(data)  # transfer string to float
-            print("\ndata:", data)
             
-            self.weight_var.set(data)
-            self.data_list.append(data)
-            self.datetime_list.append(self.time())
-            print("data list:", self.data_list)
+            try:
+                data = float(data)  # transfer string to float
+                error = 0
+            except:
+                error = 1
+            
+            if not error:
+                self.datafile.write(time()+" "+str(data)+"\n")
+                self.weight_var.set(data)
+                self.data_list.append(data)
+                #self.datetime_list.append(time())
+                # print("data list: "+ list_to_str(self.data_list))
+                
+
+                ##########  Algorithms Part  ##########
+                # print("total_weight_var: " + str(self.total_weight_var.get()))
+                if (data - self.total_weight_var.get()) >= self.save_var.get():  #  record weight
+                    self.fence_list[-1].piglet_list[-1].weight_list.append(data)
+                elif (last_data - data) >= self.save_var.get():  #  pick up pig
+                    if data < self.save_var.get():
+                        self.pig_weight.set("窩重:"+str(self.fence_list[-1].weight))
+                        self.record_history("窩重:"+str(self.fence_list[-1].weight))
+                        self.total_weight_var.set(0)
+                        self.datafile.close()
+                        self.datafile = open(today()+'_'+time()+self.sow_id.get()+'.log',"w")
+                        f = Fence()
+                        self.fence_list.append(f)
+                        self.zeroing()
+                        
+                
+                # claculate the average
+                if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= 20:
+                    temp_list = list(self.fence_list[-1].piglet_list[-1].weight_list)
+                    print("\nrecord weight: " + list_to_str(temp_list))
+                    for i in range(len(temp_list)):
+                        temp_list[i] -= self.total_weight_var.get()
+                    print("calculate weight: "+ list_to_str(temp_list))
+                    self.last_ave = round(mean(temp_list),2)
+                    self.fence_list[-1].piglet_list[-1].weight = self.last_ave
+                    self.total_weight_var.set(self.total_weight_var.get()+self.last_ave)
+                    print("average weight: " + str(self.last_ave))
+                    self.fence_list[-1].weight = self.total_weight_var.get()
+
+                    #儲存豬耳號
+                    id_list = [self.sow_id.get(),self.pig_id.get()]
+                    self.pig_id_list.append(id_list)
+                    # print(list_to_str(self.pig_id_list))
 
 
-            ##########  Algorithms Part  ##########
-            print("total_weight_var:", self.total_weight_var.get())
-            if (data - self.total_weight_var.get()) >= self.save_var.get():  #  record weight
-                self.fence_list[-1].piglet_list[-1].weight_list.append(data)
-            elif (last_data - data) >= self.save_var.get():  #  pick up pig
-                if data < self.save_var.get():
-                    self.pig_weight.set("窩重:"+str(self.fence_list[-1].weight))
-                    self.record_history("窩重:"+str(self.fence_list[-1].weight))
-                    self.total_weight_var.set(0)
-                    f = Fence()
-                    self.fence_list.append(f)
-                    self.zeroing()
+                    # claculate pig number
+                    if self.fence_list[-1].piglet_list is not []:
+                        self.piglet_save_num.set(len(self.fence_list[-1].piglet_list))
+
+                    self.pig_weight.set("小豬重: "+str(round(self.fence_list[-1].piglet_list[-1].weight,2)))
+                    self.record_history("儲存成功!")
+                    self.record_history("重量："+str(self.fence_list[-1].piglet_list[-1].weight))
+
+                    #顯示上頭豬的重量
+                    self.last_piglet_weight.set(round(self.last_ave, 2))
                     
+
+                    p = Pig()  # create a new pig
+                    self.fence_list[-1].piglet_list.append(p)
+                    self.fence_list[-1].piglet_num = len(self.fence_list[-1].piglet_list) -1
+                    #self.pig_weight.set("")
+                    
+
+
+                ##########  Degugging Part  ##########
+                print("Total Fence num: {}".format(len(self.fence_list)))
+                for j in range(len(self.fence_list)):
+                    print("No. " + str(j+1)+ "fence. " + "has " + str(len(self.fence_list[j].piglet_list)) + " pig(s).")
+                    for i in range(len(self.fence_list[j].piglet_list)):
+                        print("No. "+ str(i+1)+ " pig weight: " + list_to_str(self.fence_list[j].piglet_list[i].weight_list))
+                ##########  Debugging Part  ##########
+
+            self.weight_value_show = self.label_weighing_nowshow.after(250,self.read_data)
             
-            # claculate the average
-            if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= 8:
-                temp_list = list(self.fence_list[-1].piglet_list[-1].weight_list)
-                print("\nrecord weight:", temp_list)
-                for i in range(len(temp_list)):
-                    temp_list[i] -= self.total_weight_var.get()
-                print("calculate weight:", temp_list)
-                self.last_ave = mean(temp_list)
-                self.fence_list[-1].piglet_list[-1].weight = self.last_ave
-                self.total_weight_var.set(round(self.total_weight_var.get()+self.last_ave, 2))
-                print("average weight:", round(self.last_ave, 2))
-                self.fence_list[-1].weight = self.total_weight_var.get()
-
-                #儲存豬耳號
-                id_list = [self.sow_id.get(),self.pig_id.get()]
-                self.pig_id_list.append(id_list)
-                print(self.pig_id_list)
-
-
-                # claculate pig number
-                if self.fence_list[-1].piglet_list is not []:
-                    self.piglet_save_num.set(len(self.fence_list[-1].piglet_list))
-
-                self.pig_weight.set("小豬重: "+str(round(self.fence_list[-1].piglet_list[-1].weight,2)))
-                self.record_history("儲存成功!")
-                self.record_history("重量："+str(self.fence_list[-1].piglet_list[-1].weight))
-
-                #顯示上頭豬的重量
-                #if self.last_ave is not 0.0:
-                self.last_piglet_weight.set(round(self.last_ave, 2))
-                
-
-                p = Pig()  # create a new pig
-                self.fence_list[-1].piglet_list.append(p)
-                self.fence_list[-1].piglet_num = len(self.fence_list[-1].piglet_list) -1
-                #self.pig_weight.set("")
-                
-
-
-
-
-
-            ##########  Degugging Part  ##########
-            print("Total Fence num: {}".format(len(self.fence_list)))
-            for j in range(len(self.fence_list)):
-                print("No.", j+1, "fence.", "has", len(self.fence_list[j].piglet_list), "pig(s).")
-                for i in range(len(self.fence_list[j].piglet_list)):
-                    print("No.", i+1, "pig weight:", self.fence_list[j].piglet_list[i].weight_list)
-            ##########  Debugging Part  ##########
-
-            self.label_weighing_nowshow.after(500,self.read_data)
         else:
             print("serial is not open")
             tk.messagebox.showwarning(title="錯誤",message='尚未連線')
        
     
+    def get_record_file(self):
+        filename =  fd.askopenfilename(initialdir = "/",title = "Select file",filetypes = (("log files","*.log"),("all files","*.*")))
+        if filename is not None:
+            with open(filename, 'r') as file_to_read:
+                self.weight_values = []
+                while True:
+                    lines = file_to_read.readline()
+                    if not lines:
+                        break
+                    item = [i for i in lines.split()]
+                    self.weight_values.append(item[1])
+
+        
+    def analyze_data1(self):
+        # 取10筆data
+        _datalist = [0.0]
+        self.fence_list = []
+        f = Fence()
+        self.fence_list.append(f)
+        total_weight = 0.0
+        for i in range(len(self.weight_values)):
+            last_data = _datalist[-1]
+            try:
+                data = float(self.weight_values[i])
+            except:
+                continue
+            _datalist.append(data)
+            
+            ##########  Algorithms Part  ##########
+            if (data - total_weight) >= self.save_var.get():  #  record weight
+                self.fence_list[-1].piglet_list[-1].weight_list.append(data)
+            elif (last_data - data) >= self.save_var.get():  #  pick up pig
+                if data < self.save_var.get():
+                    total_weight = 0.0
+                    f = Fence()
+                    self.fence_list.append(f)
+            
+            # claculate the average
+            if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= 10:
+                temp_list = list(self.fence_list[-1].piglet_list[-1].weight_list)
+                for i in range(len(temp_list)):
+                    temp_list[i] -= total_weight
+                    temp_list[i] = round(temp_list[i],2)
+                self.fence_list[-1].piglet_list[-1].real_weight_list = temp_list
+                self.last_ave = round(mean(temp_list),2)
+                self.fence_list[-1].piglet_list[-1].weight = self.last_ave
+                total_weight += self.last_ave
+                self.fence_list[-1].weight = total_weight
+
+                #儲存豬耳號
+                # id_list = [self.sow_id.get(),self.pig_id.get()]
+                # self.pig_id_list.append(id_list)
+                # print(li_to_str(self.pig_id_list))
+
+                p = Pig()  # create a new pig
+                self.fence_list[-1].piglet_list.append(p)
+                self.fence_list[-1].piglet_num = len(self.fence_list[-1].piglet_list) -1
+            
+        print("analyze method 1  取10筆data, 直接算平均")
+        x = PrettyTable()
+        x.field_names = ["pig","1", "2", "3", "4","5","6","7","8","9","10","weight"]
+        for j in range(len(self.fence_list)):
+            temp = ["No.",j+1,"Fence","","","","","","","","",""]
+            x.add_row(temp)
+            for i in range(len(self.fence_list[j].piglet_list)):
+                temp = [str(i+1)+"_1"]
+                temp.extend(list(self.fence_list[j].piglet_list[i].weight_list))
+                temp.append(self.fence_list[j].piglet_list[i].weight)
+                while(len(temp) < 12):
+                    temp.append("none")
+                x.add_row(temp)
+                temp = [str(i+1)+"_2"]
+                temp.extend(list(self.fence_list[j].piglet_list[i].real_weight_list))
+                temp.append(self.fence_list[j].piglet_list[i].weight)
+                while(len(temp) < 12):
+                    temp.append("none")
+                x.add_row(temp)
+        print(x)
+        
+    
+    def analyze_data2(self):
+        # 取10筆data , 前2個不計
+        _datalist = [0.0]
+        self.fence_list = []
+        f = Fence()
+        self.fence_list.append(f)
+        total_weight = 0.0
+        for i in range(len(self.weight_values)):
+            last_data = _datalist[-1]
+            try:
+                data = float(self.weight_values[i])
+            except:
+                continue
+            
+            _datalist.append(data)
+            
+            ##########  Algorithms Part  ##########
+            if (data - total_weight) >= self.save_var.get():  #  record weight
+                self.fence_list[-1].piglet_list[-1].weight_list.append(data)
+            elif (last_data - data) >= self.save_var.get():  #  pick up pig
+                if data < self.save_var.get():
+                    total_weight = 0.0
+                    f = Fence()
+                    self.fence_list.append(f)
+            
+            # claculate the average
+            if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= 10:
+                temp_list = list(self.fence_list[-1].piglet_list[-1].weight_list)
+                for i in range(len(temp_list)):
+                    temp_list[i] -= total_weight
+                    temp_list[i] = round(temp_list[i],2)
+                self.fence_list[-1].piglet_list[-1].real_weight_list = temp_list
+                self.last_ave = round(mean(temp_list[2:]), 2)
+                self.fence_list[-1].piglet_list[-1].weight = self.last_ave
+                total_weight += self.last_ave
+                self.fence_list[-1].weight = total_weight
+
+                #儲存豬耳號
+                # id_list = [self.sow_id.get(),self.pig_id.get()]
+                # self.pig_id_list.append(id_list)
+                # print(list_to_str(self.pig_id_list))
+
+                p = Pig()  # create a new pig
+                self.fence_list[-1].piglet_list.append(p)
+                self.fence_list[-1].piglet_num = len(self.fence_list[-1].piglet_list) -1
+            
+        print("analyze method 2, 10筆data中前2個不計, 後8個算平均")
+        x = PrettyTable()
+        x.field_names = ["pig","1", "2", "3", "4","5","6","7","8","9","10","weight"]
+        for j in range(len(self.fence_list)):
+            temp = ["No.",j+1,"Fence","","","","","","","","",""]
+            x.add_row(temp)
+            for i in range(len(self.fence_list[j].piglet_list)):
+                temp = [str(i+1)+"_1"]
+                temp.extend(list(self.fence_list[j].piglet_list[i].weight_list))
+                temp.append(self.fence_list[j].piglet_list[i].weight)
+                while(len(temp) < 12):
+                    temp.append("none")
+                x.add_row(temp)
+                temp = [str(i+1)+"_2"]
+                temp.extend(list(self.fence_list[j].piglet_list[i].real_weight_list))
+                temp.append(self.fence_list[j].piglet_list[i].weight)
+                while(len(temp) < 12):
+                    temp.append("none")
+                x.add_row(temp)
+        print(x)
+
+
+    def analyze_data3(self):
+        # 取10筆data, 算標準差
+        _datalist = [0.0]
+        self.fence_list = []
+        f = Fence()
+        self.fence_list.append(f)
+        total_weight = 0.0
+        for i in range(len(self.weight_values)):
+            last_data = _datalist[-1]
+            try:
+                data = float(self.weight_values[i])
+            except:
+                continue
+            
+            _datalist.append(data)
+            
+            ##########  Algorithms Part  ##########
+            if (data - total_weight) >= self.save_var.get():  #  record weight
+                self.fence_list[-1].piglet_list[-1].weight_list.append(data)
+            elif (last_data - data) >= self.save_var.get():  #  pick up pig
+                if data < self.save_var.get():
+                    total_weight = 0.0
+                    f = Fence()
+                    self.fence_list.append(f)
+            
+            # claculate the weight
+            if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= 10:
+                temp_list = list(self.fence_list[-1].piglet_list[-1].weight_list)
+                for i in range(len(temp_list)):
+                    temp_list[i] -= total_weight
+                    temp_list[i] = round(temp_list[i],2)
+                self.fence_list[-1].piglet_list[-1].real_weight_list = temp_list
+                
+                ave = round(mean(temp_list), 2) # 平均
+                std_err = round(np.std(temp_list), 2) # 標準差
+                self.fence_list[-1].piglet_list[-1].std_err = std_err
+                
+                #  刪除離群值再取平均
+                temp_list_std = []
+                for i in range(len(temp_list)):
+                    if abs(temp_list[i] - ave)/std_err <= 1:
+                        temp_list_std.append(temp_list[i])
+                self.fence_list[-1].piglet_list[-1].std_weight_list = temp_list_std
+                self.last_ave = round(mean(temp_list_std), 2)
+
+                self.fence_list[-1].piglet_list[-1].weight = self.last_ave
+                total_weight += self.last_ave
+                self.fence_list[-1].weight = total_weight
+
+                #儲存豬耳號
+                # id_list = [self.sow_id.get(),self.pig_id.get()]
+                # self.pig_id_list.append(id_list)
+                # print(list_to_str(self.pig_id_list))
+
+                p = Pig()  # create a new pig
+                self.fence_list[-1].piglet_list.append(p)
+                self.fence_list[-1].piglet_num = len(self.fence_list[-1].piglet_list) -1
+            
+        print("analyze method 3, 10筆data算標準差")
+        x = PrettyTable()
+        x.field_names = ["pig","1", "2", "3", "4","5","6","7","8","9","10", "std", "weight"]
+        for j in range(len(self.fence_list)):
+            temp = ["No.",j+1,"Fence","","","","","","","","","",""]
+            x.add_row(temp)
+            for i in range(len(self.fence_list[j].piglet_list)):
+                temp = [str(i+1)+"_1"]
+                temp.extend(list(self.fence_list[j].piglet_list[i].weight_list))
+                temp.append(self.fence_list[j].piglet_list[i].std_err)
+                temp.append(self.fence_list[j].piglet_list[i].weight)
+                while(len(temp) < 13):
+                    temp.append("none")
+                x.add_row(temp)
+                temp = [str(i+1)+"_2"]
+                temp.extend(list(self.fence_list[j].piglet_list[i].real_weight_list))
+                temp.append(self.fence_list[j].piglet_list[i].std_err)
+                temp.append(self.fence_list[j].piglet_list[i].weight)
+                while(len(temp) < 13):
+                    temp.append("none")
+                x.add_row(temp)
+                temp = [str(i+1)+"_3"]
+                temp.extend(list(self.fence_list[j].piglet_list[i].std_weight_list))
+                while(len(temp) < 11):
+                    temp.append("none")
+                temp.append(self.fence_list[j].piglet_list[i].std_err)
+                temp.append(self.fence_list[j].piglet_list[i].weight)
+                x.add_row(temp)
+        print(x)
 
 
 
@@ -431,7 +719,7 @@ class mySerialPort:
     def write_data(self, info):  #寫入資料
         try:
             if self.ser.is_open == True:
-                print(info)
+                print(str(info))
                 self.ser.write(info.encode("utf-8"))
 
             else:
@@ -446,7 +734,10 @@ class mySerialPort:
 class Pig():
     def __init__(self):
         self.weight_list = []
+        self.real_weight_list = []
+        self.std_weight_list = []
         self.weight = 0.0
+        self.std_err = 0.0
 
 
 class Fence():
