@@ -1,0 +1,6 @@
+prettytable==2.0.0
+statsmodels==0.12.1
+numpy==1.19.5
+pytz==2020.5
+pandas==1.2.1
+pyserial==3.5
