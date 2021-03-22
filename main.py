@@ -10,15 +10,15 @@ from tkinter import simpledialog as sd
 from tkinter import filedialog as fd
 from tkinter import *
 from datetime import datetime
-import serial
+from serial import SerialException, Serial
+# import serial
 import serial.tools.list_ports
 from statistics import mean
 import csv
-import xlrd
 import logging
 from prettytable import PrettyTable
-import numpy as np
-import os
+from numpy import std
+from os import getcwd
 from serial import SerialException
 
 
@@ -44,8 +44,8 @@ def today():
 # set up logging to file - see previous section for more details
 logging.basicConfig(level=logging.DEBUG,
                     # format='%(asctime)s %(name)-4s %(message)s',
-                    format='%(asctime)s %(message)s',
-                    datefmt='%m-%d %H:%M',
+                    format='%(asctime)s\'%(msecs)03d %(message)s',
+                    datefmt='%m-%d %H:%M:%S',
                     filename='terminal'+today()+'_'+time()+'.log',
                     filemode='w')
 # define a Handler which writes INFO messages or higher to the sys.stderr
@@ -99,6 +99,7 @@ class PigGUI(tk.Tk):
         self.fence_list = []
         self.last_ave = 0.0
         self.piglet_id_list = []
+        self.analyzed_datalist = []
         self.record_history("完成初始化")
         
 
@@ -141,9 +142,14 @@ class PigGUI(tk.Tk):
 
         speed = tk.Label(frame,text="紀錄速率", font=10).pack(side=TOP,fill = X, padx=10, pady=5)
         self.ac_rate = tk.IntVar()  # 選擇速率
-        cbb_rate = ttk.Combobox(frame,values=[1, 2, 4, 8, 10, 16], textvariable = self.ac_rate, state="readonly", width=12, font=10)
+        cbb_rate = ttk.Combobox(frame,values=[1, 2, 4, 8], textvariable = self.ac_rate, state="readonly", width=12, font=10)
         self.ac_rate.set(4)
         cbb_rate.pack(side=TOP,fill = X, padx=10, pady=5)
+
+        self.sample_size_var = tk.IntVar() #選擇統計分析樣本數
+        sample_size = ttk.Combobox(frame,values=[10, 12, 14, 18, 20], textvariable = self.sample_size_var, state="readonly", width=12, font=10)
+        self.sample_size_var.set(12)
+        sample_size.pack(side=TOP,fill = X, padx=10, pady=5)
 
         btn_clean = tk.Button(frame,text="清除上筆", font=10)
         btn_clean.pack(side=TOP,fill = X, padx=10, pady=5)
@@ -295,7 +301,7 @@ class PigGUI(tk.Tk):
         self.status_var.set("disconnect")
         self.save_var.set(0.0) # 初始值0
         self.total_weight_var.set(0.0)
-        self.storage_path_var.set(os.getcwd())
+        self.storage_path_var.set(getcwd())
         setting1 = tk.Label(setting_entry,width=10,textvariable=self.status_var).grid(row=0, column=0)
         setting2 = tk.Label(setting_entry,width=10,textvariable=self.save_var).grid(row=1, column=0)
         setting3 = tk.Label(setting_entry,width=10,textvariable=self.total_weight_var).grid(row=2, column=0)
@@ -328,6 +334,7 @@ class PigGUI(tk.Tk):
     def connecting(self):
         temp = self.port_var.get()
         try:
+            # self.datafile = open(today()+'_'+time()+'.log',"w")
             self.myserial.open_port(temp)
             self.status_var.set("connect")
             self.record_history("連線")
@@ -349,8 +356,8 @@ class PigGUI(tk.Tk):
         # start reading
         if self.myserial.opened:
             self.zeroing()
-            self.datafile = open(today()+'_'+time()+self.input_sow_id.get()+'.log',"w")
             f = Fence() # create a new fence
+            self.datafile = open(today()+'_'+time()+'.log',"w")
             self.fence_list.append(f)
             self.label_weighing_nowshow.after(0, self.read_data)
             self.record_history("開始秤重")
@@ -390,8 +397,9 @@ class PigGUI(tk.Tk):
             for j in range(len(self.fence_list)-1):
                 if self.fence_list[j].weight is not None:
                     for i in range(len(self.fence_list[j].piglet_list)-1):
-                        if self.fence_list[j].piglet_list[i].weight is not None:
+                        if type(self.fence_list[j].piglet_list[i].weight) == "float":
                             temp = [self.fence_list[j].pig_id[i][0],self.fence_list[j].pig_id[i][1],self.fence_list[j].piglet_list[i].weight]
+                            print(temp)
                             write.writerow(temp)
                     temp1 = ["", "", "total", self.fence_list[j].weight]
                     write.writerow(temp1)
@@ -401,7 +409,6 @@ class PigGUI(tk.Tk):
         if self.myserial.ser.is_open == True:
             # get last data
             last_data = self.data_list[-1]
-            
             # read current data
             try:
                 # self.myserial.write_data("RW\r\n")
@@ -417,8 +424,9 @@ class PigGUI(tk.Tk):
                     error = 0
                 except:
                     error = 1
+                    print("qqqqq")
                 if not error:
-                    self.datafile.write(time()+" "+str(data)+"\n")
+                    self.datafile.write(datetime.utcnow().strftime('%H:%M:%S.%f')[:-3] + " " + str(data) + "\n")
                     self.weight_var.set(data)
                     self.data_list.append(data)
 
@@ -437,14 +445,14 @@ class PigGUI(tk.Tk):
                             self.input_sow_id.set("請輸入耳號")
                             self.total_weight_var.set(0)
                             self.datafile.close()
-                            self.datafile = open(today()+'_'+time()+self.input_sow_id.get()+'.log',"w")
+                            self.datafile = open(today()+'_'+time()+'.log',"w")
                             f = Fence()
                             self.fence_list.append(f)
                             self.zeroing()
                             
                     
                     # claculate the average
-                    if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= 28:
+                    if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= 35:
                         temp_list = list(self.fence_list[-1].piglet_list[-1].weight_list)
                         # print("record weight: " + list_to_str(temp_list))
                         for i in range(len(temp_list)):
@@ -484,7 +492,7 @@ class PigGUI(tk.Tk):
                         for i in range(len(self.fence_list[j].piglet_list)):
                             print("No. "+ str(i+1)+ " pig weight: " + list_to_str(self.fence_list[j].piglet_list[i].weight_list))
                     ##########  Debugging Part  ##########
-            except serial.SerialException as e:
+            except SerialException as e:
                 print(str(e))
                 pass
             finally:
@@ -497,10 +505,6 @@ class PigGUI(tk.Tk):
                     t = 250
                 elif self.ac_rate.get() == 8:
                     t = 125
-                elif self.ac_rate.get() == 10:
-                    t = 100
-                elif self.ac_rate.get() == 16:
-                    t = 62
                 self.weight_value_show = self.label_weighing_nowshow.after(t, self.read_data)
             
         else:
@@ -520,9 +524,33 @@ class PigGUI(tk.Tk):
                     item = [i for i in lines.split()]
                     self.weight_values.append(item[1])
 
-        
+    def analyzed_data_output(self,statistic_method):
+        #儲存不同統計方法所得之秤重值，並輸出至csv檔
+        temp_list = self.analyzed_datalist
+        file_path = self.storage_path_var.get()
+
+        with open(file_path + "/" + today() + "analyzed data" +'.csv','w',encoding="utf-8",newline='') as csv_file:
+            write = csv.writer(csv_file)
+            inner_list = [str(statistic_method)]
+            for j in range(len(self.fence_list)):
+                for i in range(len(self.fence_list[j].piglet_list)):
+                    if self.fence_list[j].piglet_list[i].weight is not None:
+                        inner_list.append(self.fence_list[j].piglet_list[i].weight)
+            temp_list.append(inner_list)
+            print(temp_list)
+            # lines = []
+            # for line in temp_list[i]:
+            #     if line.split():
+            #         lines.append(line)
+            #     else:
+            #         outfopen.writelines("")
+            output_list = zip(*temp_list)
+            write.writerows(output_list)
+        self.analyzed_datalist.append(inner_list)
+
     def analyze_data1(self):
         # 取10筆data
+        sample_size = self.sample_size_var.get()
         _datalist = [0.0]
         self.fence_list = []
         f = Fence()
@@ -546,7 +574,7 @@ class PigGUI(tk.Tk):
                     self.fence_list.append(f)
             
             # claculate the average
-            if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= 10:
+            if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= sample_size:
                 temp_list = list(self.fence_list[-1].piglet_list[-1].weight_list)
                 for i in range(len(temp_list)):
                     temp_list[i] -= total_weight
@@ -566,30 +594,12 @@ class PigGUI(tk.Tk):
                 self.fence_list[-1].piglet_list.append(p)
                 self.fence_list[-1].piglet_num = len(self.fence_list[-1].piglet_list) -1
             
-        print("analyze method 1  取10筆data, 直接算平均")
-        x = PrettyTable()
-        x.field_names = ["pig","1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "weight"]
-        for j in range(len(self.fence_list)):
-            temp = ["No.",j+1,"Fence","","","","","","","","",""]
-            x.add_row(temp)
-            for i in range(len(self.fence_list[j].piglet_list)):
-                temp = [str(i+1)+"_1"]
-                temp.extend(list(self.fence_list[j].piglet_list[i].weight_list))
-                temp.append(self.fence_list[j].piglet_list[i].weight)
-                while(len(temp) < 12):
-                    temp.append("none")
-                x.add_row(temp)
-                temp = [str(i+1)+"_2"]
-                temp.extend(list(self.fence_list[j].piglet_list[i].real_weight_list))
-                temp.append(self.fence_list[j].piglet_list[i].weight)
-                while(len(temp) < 12):
-                    temp.append("none")
-                x.add_row(temp)
-        print(x)
+        self.analyzed_data_output("Method1")
         
     
     def analyze_data2(self):
         # 取10筆data , 前2個不計
+        sample_size = self.sample_size_var.get()
         _datalist = [0.0]
         self.fence_list = []
         f = Fence()
@@ -614,7 +624,7 @@ class PigGUI(tk.Tk):
                     self.fence_list.append(f)
             
             # claculate the average
-            if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= 10:
+            if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= sample_size:
                 temp_list = list(self.fence_list[-1].piglet_list[-1].weight_list)
                 for i in range(len(temp_list)):
                     temp_list[i] -= total_weight
@@ -634,30 +644,12 @@ class PigGUI(tk.Tk):
                 self.fence_list[-1].piglet_list.append(p)
                 self.fence_list[-1].piglet_num = len(self.fence_list[-1].piglet_list) -1
             
-        print("analyze method 2, 10筆data中前2個不計, 後8個算平均")
-        x = PrettyTable()
-        x.field_names = ["pig","1", "2", "3", "4","5","6","7","8","9","10","weight"]
-        for j in range(len(self.fence_list)):
-            temp = ["No.",j+1,"Fence","","","","","","","","",""]
-            x.add_row(temp)
-            for i in range(len(self.fence_list[j].piglet_list)):
-                temp = [str(i+1)+"_1"]
-                temp.extend(list(self.fence_list[j].piglet_list[i].weight_list))
-                temp.append(self.fence_list[j].piglet_list[i].weight)
-                while(len(temp) < 12):
-                    temp.append("none")
-                x.add_row(temp)
-                temp = [str(i+1)+"_2"]
-                temp.extend(list(self.fence_list[j].piglet_list[i].real_weight_list))
-                temp.append(self.fence_list[j].piglet_list[i].weight)
-                while(len(temp) < 12):
-                    temp.append("none")
-                x.add_row(temp)
-        print(x)
+        self.analyzed_data_output("Method2")
 
 
     def analyze_data3(self):
         # 取10筆data, 算標準差
+        sample_size = self.sample_size_var.get()
         _datalist = [0.0]
         self.fence_list = []
         f = Fence()
@@ -682,7 +674,7 @@ class PigGUI(tk.Tk):
                     self.fence_list.append(f)
             
             # claculate the weight
-            if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= 10:
+            if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= sample_size:
                 temp_list = list(self.fence_list[-1].piglet_list[-1].weight_list)
                 for i in range(len(temp_list)):
                     temp_list[i] -= total_weight
@@ -690,7 +682,7 @@ class PigGUI(tk.Tk):
                 self.fence_list[-1].piglet_list[-1].real_weight_list = temp_list
                 
                 ave = round(mean(temp_list), 2) # 平均
-                std_err = round(np.std(temp_list), 2) # 標準差
+                std_err = round(std(temp_list), 2) # 標準差
                 self.fence_list[-1].piglet_list[-1].std_err = std_err
                 
                 #  刪除離群值再取平均
@@ -714,35 +706,7 @@ class PigGUI(tk.Tk):
                 self.fence_list[-1].piglet_list.append(p)
                 self.fence_list[-1].piglet_num = len(self.fence_list[-1].piglet_list) -1
             
-        print("analyze method 3, 10筆data算標準差")
-        x = PrettyTable()
-        x.field_names = ["pig","1", "2", "3", "4","5","6","7","8","9","10", "std", "weight"]
-        for j in range(len(self.fence_list)):
-            temp = ["No.",j+1,"Fence","","","","","","","","","",""]
-            x.add_row(temp)
-            for i in range(len(self.fence_list[j].piglet_list)):
-                temp = [str(i+1)+"_1"]
-                temp.extend(list(self.fence_list[j].piglet_list[i].weight_list))
-                temp.append(self.fence_list[j].piglet_list[i].std_err)
-                temp.append(self.fence_list[j].piglet_list[i].weight)
-                while(len(temp) < 13):
-                    temp.append("none")
-                x.add_row(temp)
-                temp = [str(i+1)+"_2"]
-                temp.extend(list(self.fence_list[j].piglet_list[i].real_weight_list))
-                temp.append(self.fence_list[j].piglet_list[i].std_err)
-                temp.append(self.fence_list[j].piglet_list[i].weight)
-                while(len(temp) < 13):
-                    temp.append("none")
-                x.add_row(temp)
-                temp = [str(i+1)+"_3"]
-                temp.extend(list(self.fence_list[j].piglet_list[i].std_weight_list))
-                while(len(temp) < 11):
-                    temp.append("none")
-                temp.append(self.fence_list[j].piglet_list[i].std_err)
-                temp.append(self.fence_list[j].piglet_list[i].weight)
-                x.add_row(temp)
-        print(x)
+        self.analyzed_data_output("Method 3")
 
 
     def save_setting(self):
@@ -780,7 +744,7 @@ class mySerialPort:
         self.opened = False
     
     def open_port(self, _comport):  #打開串口埠
-        self.ser = serial.Serial(_comport, self.BAUD_RATES, timeout=None)   # 初始化序列通訊埠
+        self.ser = Serial(_comport, self.BAUD_RATES, timeout=1)   # 初始化序列通訊埠
         self.opened = True
         print("open!\n")
     
