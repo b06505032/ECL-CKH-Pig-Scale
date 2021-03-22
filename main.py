@@ -80,11 +80,12 @@ class PigGUI(tk.Tk):
         self.title("仔豬磅秤")
         screenwidth = self.winfo_screenwidth()
         screenheight = self.winfo_screenheight()
-        self.geometry("900x500+200+200")
+        self.geometry("1000x630+200+200")
         self.setting_frame()
         self.weight_frame()
         self.data_frame()
         self.record_frame()
+        self.temp_frame()
         self.myserial = mySerialPort(9600)
         self.record_list = []
         self.save_setting()
@@ -96,8 +97,9 @@ class PigGUI(tk.Tk):
         self.data_list = [0.0]
         self.fence_list = []
         self.last_ave = 0.0
-        self.pig_id_list = []
+        self.piglet_id_list = []
         self.record_history("完成初始化")
+        
 
 
     def select_folder(self):
@@ -130,23 +132,40 @@ class PigGUI(tk.Tk):
         self.text_history.yview_pickplace("end")
         self.text_history.configure(state='disabled')
 
+    def temp_frame(self):
+        frame = ttk.LabelFrame(self,text="測試用")
+        frame.place(x=780,y=10)
+    
+        self.btn_set1 = tk.Button(frame,text="設定儲存鎖定值", command=self.save_setting, font=10)
+        self.btn_set1.pack(side=TOP,fill = X, padx=10, pady=5)
+
+        speed = tk.Label(frame,text="紀錄速率", font=10).pack(side=TOP,fill = X, padx=10, pady=5)
+        self.ac_rate = tk.IntVar()  # 選擇速率
+        cbb_rate = ttk.Combobox(frame,values=[1, 2, 4, 8, 16], textvariable = self.ac_rate, state="readonly", width=12, font=10)
+        self.ac_rate.set(1)
+        cbb_rate.pack(side=TOP,fill = X, padx=10, pady=5)
+
+        btn_clean = tk.Button(frame,text="清除上筆", font=10)
+        btn_clean.pack(side=TOP,fill = X, padx=10, pady=5)
+        
+        
+        btn_get_record_data = tk.Button(frame,text="取得歷史測試資料", command=self.get_record_file, font=10)
+        btn_get_record_data.pack(side=TOP,fill = X, padx=10, pady=5)
+        btn_analyze_data1 = tk.Button(frame,text="分析測試資料1", command=self.analyze_data1, font=10)
+        btn_analyze_data1.pack(side=TOP,fill = X, padx=10, pady=5)
+        Hovertip(btn_analyze_data1, "直接取平均", hover_delay=100)
+        btn_analyze_data2 = tk.Button(frame,text="分析測試資料2", command=self.analyze_data2, font=10)
+        btn_analyze_data2.pack(side=TOP,fill = X, padx=10, pady=5)
+        Hovertip(btn_analyze_data2, "前兩筆不計，取平均", hover_delay=100)
+        btn_analyze_data3 = tk.Button(frame,text="分析測試資料3", command=self.analyze_data3, font=10)
+        btn_analyze_data3.pack(side=TOP,fill = X, padx=10, pady=5)
+        Hovertip(btn_analyze_data3, "算標準差，刪除異端值，取平均", hover_delay=100)
 
     def setting_frame(self):
-        frm_1 = tk.Frame(self)
-        frm_1.place(x=10,y=10)
-        self.btn_set1 = tk.Button(frm_1,text="設定儲存鎖定值", command=self.save_setting)
-        self.btn_set1.grid(row=0,column=0)
-        self.btn_set2 = tk.Button(frm_1,text="秤重資料儲存",command=self.output_csv)
-        self.btn_set2.grid(row=0,column=1)
-        self.btn_set3 = tk.Button(frm_1,text="上傳豬隻身分資料",command=self.select_file)
-        self.btn_set3.grid(row=1,column=0)
-        self.btn_set4 = tk.Button(frm_1,text="設定資料儲存路徑",command=self.select_folder)
-        self.btn_set4.grid(row=1,column=1)
-        self.btn_connect = tk.Button(frm_1,command=self.connecting,text="連線")
-        self.btn_connect.grid(row=0,column=2)
-        self.btn_weighing = tk.Button(frm_1,command=self.weighing,text="開始秤重", state = DISABLED)
-        self.btn_weighing.grid(row=1,column=2)
+        frm_1 = ttk.LabelFrame(self,text="一般設定")
+        frm_1.place(x=15,y=10)
         
+        #取得串口埠
         port_list = list(serial.tools.list_ports.comports())
         assert (len(port_list) != 0),"无可用串口"
         port_str_list = []
@@ -156,98 +175,119 @@ class PigGUI(tk.Tk):
             print("port: " + str(i) + " " + str(port_list[i]))
             str_list = lines.split(" ")
             port_str_list.append(str_list[0])
-        self.port_var = tk.StringVar()
-        cbb_com = ttk.Combobox(frm_1,values=port_str_list, textvariable = self.port_var, state="readonly", width=12)
-        cbb_com.grid(row=2,column=0)
-        
-        cbb_staff = ttk.Combobox(frm_1,values=["小明","阿嬌"], width=12)
-        cbb_staff.grid(row=2,column=1)
 
-        self.ac_rate = tk.IntVar()  # 選擇速率
-        cbb_rate = ttk.Combobox(frm_1,values=[1, 2, 4, 8, 16], textvariable = self.ac_rate, state="readonly", width=12)
-        self.ac_rate.set(1)
-        cbb_rate.grid(row=2,column=2)
+        self.port_var = tk.StringVar()
+        self.port_var.set("請選擇連線串口埠")
+        cbb_com = ttk.Combobox(frm_1,values=port_str_list, textvariable = self.port_var, state="readonly", width=15, font=20)
+        cbb_com.pack(side=TOP,fill = X, padx=10, pady=5)
+
+        self.btn_connect = tk.Button(frm_1,command=self.connecting,text="連線", font=20)
+        self.btn_connect.pack(side=TOP,fill = X, padx=10, pady=5)
+        self.btn_weighing = tk.Button(frm_1,command=self.weighing,text="開始秤重", state = DISABLED, font=20)
+        self.btn_weighing.pack(side=TOP,fill = X, padx=10, pady=5)
+        self.btn_set4 = tk.Button(frm_1,text="設定資料儲存路徑",command=self.select_folder, font=20)
+        self.btn_set4.pack(side=TOP,fill = X, padx=10, pady=5)
+        self.btn_set2 = tk.Button(frm_1,text="秤重資料儲存",command=self.output_csv, font=20)
+        self.btn_set2.pack(side=TOP,fill = X, padx=10, pady=5)
+       
+        cbb_staff = ttk.Combobox(frm_1,values=["小明","阿嬌"], width=12, font=20)
+        cbb_staff.pack(side=TOP,fill = X, padx=10, pady=5)
+
+
+    def change_color(self,event): #點擊widget時，改變其顏色
+        widget = self.focus_get()
+        if self.en_sow['fg']=="red" and str(widget) == ".!labelframe2.!entry":
+            self.sow_id.set("")
+            self.en_sow.configure(font=("Calibri",33),width=8, fg="black")
+            print("sow"+str(widget))
+         
+        elif self.en_piglet['fg']=="red" and str(widget) == ".!labelframe2.!entry2":
+            self.piglet_id.set("")
+            self.en_piglet.configure(font=("Calibri",33),width=8, fg="black")
+            print("piglet"+str(widget))
+
+        # else:
+        #     # self.lb_sow.focus_set()
+        #     print("x:"+str(event.x)+"/y:"+str(event.y))
+
+
+
     
     def data_frame(self):
-        frm_2 = tk.Frame(self)
-        frm_2.place(x=10,y=200)
+        frm_2 = ttk.LabelFrame(self,text="耳號設定", relief=RIDGE)
+        frm_2.place(x=15,y=325)
         
-        frm_2_up = tk.Frame(frm_2)
-        frm_2_down = tk.Frame(frm_2)
-        frm_2_up.pack(side='top')
-        frm_2_down.pack(side='bottom')
 
-        self.sow_id, self.pig_id = tk.StringVar(), tk.StringVar()
-        self.sow_id.set("default")
-        self.pig_id.set("default")
+        self.sow_id, self.piglet_id = tk.StringVar(), tk.StringVar()
+        self.sow_id.set("請輸入耳號")
+        self.piglet_id.set("請輸入耳號")
 
-        lb_sow =  tk.Label(frm_2_up,text="母豬資料")
-        lb_sow.grid(row=0,column=0)
-        lb_smallpig = tk.Label(frm_2_up,text="仔豬資料")
-        lb_smallpig.grid(row=0,column=1)
-        en_sow = tk.Entry(frm_2_up, textvariable = self.sow_id)
-        en_sow.grid(row=1,column=0)
-        en_smallpig = tk.Entry(frm_2_up, textvariable = self.pig_id)
-        en_smallpig.grid(row=1,column=1)
+        lb_sow =  tk.Label(frm_2,text="母豬耳號", font=13)
+        lb_sow.pack(side=TOP, padx=10, pady=5, anchor=tk.W)
+        self.en_sow = tk.Entry(frm_2, textvariable = self.sow_id, font=("Calibri",26),width=10, fg="red")
+        self.en_sow.pack(side=TOP, padx=10, pady=5,ipady=3)
+        self.bind("<Button-1>", lambda e: self.change_color(e))
         
-        btn_zero = tk.Button(frm_2_down,text="歸零", command = self.zeroing)
-        btn_zero.grid(row=0,column=0)
-        btn_clean = tk.Button(frm_2_down,text="清除上筆")
-        btn_clean.grid(row=0,column=1)
         
-        btn_get_record_data = tk.Button(frm_2_down,text="取得歷史測試資料", command=self.get_record_file)
-        btn_get_record_data.grid(row=1,column=0)
-        btn_analyze_data1 = tk.Button(frm_2_down,text="分析測試資料1", command=self.analyze_data1)
-        btn_analyze_data1.grid(row=2,column=0)
-        Hovertip(btn_analyze_data1, "直接取平均", hover_delay=100)
-        btn_analyze_data2 = tk.Button(frm_2_down,text="分析測試資料2", command=self.analyze_data2)
-        btn_analyze_data2.grid(row=2,column=1)
-        Hovertip(btn_analyze_data2, "前兩筆不計，取平均", hover_delay=100)
-        btn_analyze_data3 = tk.Button(frm_2_down,text="分析測試資料3", command=self.analyze_data3)
-        btn_analyze_data3.grid(row=2,column=2)
-        Hovertip(btn_analyze_data3, "算標準差，刪除異端值，取平均", hover_delay=100)
-       
+
+        lb_piglet = tk.Label(frm_2,text="仔豬耳號", font=13)
+        lb_piglet.pack(side=TOP, padx=10, pady=5, anchor=tk.W)
+        self.en_piglet = tk.Entry(frm_2, textvariable = self.piglet_id, font=("Calibri",26),width=10, fg="red")
+        self.en_piglet.pack(side=TOP, padx=10, pady=5,ipady=3)
+
+        self.btn_set3 = tk.Button(frm_2,text="上傳豬隻身分資料",command=self.select_file, font=20)
+        self.btn_set3.pack(side=TOP, padx=10, pady=5, fill=X)
+
+ 
         
+
+
     def weight_frame(self):
-        frm_3 = tk.Frame(self)
-        frm_3.place(x=450,y=10)
-        lb_nowshow = tk.Label(frm_3,text="目前秤值")
-        lb_nowshow.grid(row=0,column=0)
+        frm_3 = tk.Frame(self, bd=1, padx=10, pady=10, relief=RAISED)
+        frm_3.place(x=250,y=15)
+
+        
         self.weight_var = tk.StringVar()
-        self.weight_var.set(0)
-        ####
-        # label_weighing_nowshow = tk.Label(frm_3,height=5,textvariable=self.weight_var,width=20)
-        # label_weighing_nowshow.grid(row=1,column=0)
+        self.weight_var.set("0.0kg")
+        lb_current_weight = tk.Label(frm_3,text="目前秤值",font=20)
+        lb_current_weight.pack(side=TOP,anchor=tk.W)
+        self.label_weighing_nowshow = tk.Label(frm_3,textvariable=self.weight_var,font=("Calibri",90),bd=2,anchor=tk.E,width=7,height=1,bg="white",fg="black",padx=10)
+        self.label_weighing_nowshow.pack(side=TOP,pady=5,fill = X)
+        btn_zero = tk.Button(frm_3,text="歸零", command = self.zeroing, font=20)
+        btn_zero.pack(side=TOP, anchor=tk.E)
         
-        self.label_weighing_nowshow = tk.Label(frm_3,height=5,textvariable=self.weight_var,width=20)
-        self.label_weighing_nowshow.grid(row=1,column=0)
+        self.piglet_save_num, self.litter_weight, self.piglet_weight = tk.StringVar(), tk.StringVar(), tk.StringVar()
+        self.piglet_save_num.set("已存豬數：0")
+        self.litter_weight.set("0.0kg")
+        self.piglet_weight.set("0.0kg")
+
+        # # 已存豬數
+        # lb_savenum = tk.Label(frm_3,textvariable=self.piglet_save_num, font=20)
+        # lb_savenum.pack(side=TOP, anchor=tk.E)
+
+        lb_pig_weight = tk.Label(frm_3,text="仔豬重",font=20)
+        lb_pig_weight.pack(side=TOP,anchor=tk.W)
+        self.pig_weight_show = tk.Label(frm_3,textvariable=self.piglet_weight,font=("Calibri",60),bd=1,anchor=tk.W,bg="gray77",fg="gray77",padx=10,width=11,height=1)
+        self.pig_weight_show.pack(side=TOP,pady=5)
         
-        self.piglet_save_num, self.last_piglet_weight, self.pig_weight = tk.IntVar(), tk.DoubleVar(), tk.StringVar()
-        self.piglet_save_num.set(0)
-        self.last_piglet_weight.set(0.0)
-        self.pig_weight.set("")
 
-        lb_lastshow = tk.Label(frm_3,text="上頭豬重量")
-        lb_lastshow.grid(row=2,column=1)
-        lb_savenum = tk.Label(frm_3,text="已存豬數")
-        lb_savenum.grid(row=2,column=0)
-        pig_weight_show = tk.Label(frm_3,textvariable=self.pig_weight, font=30)
-        pig_weight_show.grid(row=1,column=2)
-        text_weighing_lastshow = tk.Label(frm_3,height=1,textvariable=self.last_piglet_weight ,width=20)
-        text_weighing_lastshow.grid(row=3,column=1)
-        text_weighing_savenum = tk.Label(frm_3,height=1,textvariable=self.piglet_save_num,width=20)
-        text_weighing_savenum.grid(row=3,column=0)
+        lb_litter_weighing = tk.Label(frm_3,text="窩重",font=20)
+        lb_litter_weighing.pack(side=TOP,anchor=tk.W)
+        self.litter_weighing_show = tk.Label(frm_3,textvariable=self.litter_weight,font=("Calibri",60),bd=1,anchor=tk.W,bg="gray77",fg="gray77",padx=10,width=11,height=1)
+        self.litter_weighing_show.pack(side=TOP,pady=5)
 
+     
+        
     def record_frame(self):
-        frm_4 = tk.Frame(self)
-        frm_4.place(x=450,y=200)
+        frm_4 = tk.Frame(self, bg="#DCDCDC")
+        frm_4.place(x=780,y=420)
         
         setting = tk.Label(frm_4,text="設定內容")
         setting.grid(row=0,column=1)
         # history = tk.Label(frm_4,text="歷史紀錄")
         # history.grid(row=0,column=2)
         
-        setting_context = tk.LabelFrame(frm_4,padx=5, pady=5)
+        setting_context = tk.LabelFrame(frm_4,padx=2, pady=2)
         setting_context.grid(column=0,row=1)
         r1 = tk.Label(setting_context, text="狀態:").grid(row=0, column=0)
         r2 = tk.Label(setting_context, text="儲存鎖定值:").grid(row=1, column=0)
@@ -354,12 +394,13 @@ class PigGUI(tk.Tk):
                 i = len(self.fence_list[j].piglet_list)-1
                 k = i*j
                 for i in range(len(self.fence_list[j].piglet_list)-1):
-                    temp = [self.pig_id_list[k],self.fence_list[j].piglet_list[i].weight]
+                    temp = [self.piglet_id_list[k],self.fence_list[j].piglet_list[i].weight]
                     temp.extend(self.fence_list[j].piglet_list[i].weight_list)
                     write.writerow(temp)
                     k = k + 1
                 temp1 = ["", "", "total", self.fence_list[j].weight]
                 write.writerow(temp1)
+
 
 
     def read_data(self):  #讀取資料
@@ -393,10 +434,15 @@ class PigGUI(tk.Tk):
                 # print("total_weight_var: " + str(self.total_weight_var.get()))
                 if (data - self.total_weight_var.get()) >= self.save_var.get():  #  record weight
                     self.fence_list[-1].piglet_list[-1].weight_list.append(data)
+                    self.pig_weight_show.configure(bg="gray77",fg="gray77")
+                    self.litter_weighing_show.configure(bg="gray77",fg="gray77")
                 elif (last_data - data) >= self.save_var.get():  #  pick up pig
                     if data < self.save_var.get():
-                        self.pig_weight.set("窩重:"+str(self.fence_list[-1].weight))
+                        self.litter_weight.set(str(round(self.fence_list[-1].weight,2))+"kg")
+                        self.litter_weighing_show.configure(bg="white",fg="black")
                         self.record_history("窩重:"+str(self.fence_list[-1].weight))
+                        self.en_sow.configure(font=("Calibri",26),width=10, fg="red")
+                        self.sow_id.set("請輸入耳號")
                         self.total_weight_var.set(0)
                         self.datafile.close()
                         self.datafile = open(today()+'_'+time()+self.sow_id.get()+'.log',"w")
@@ -419,25 +465,25 @@ class PigGUI(tk.Tk):
                     self.fence_list[-1].weight = self.total_weight_var.get()
 
                     #儲存豬耳號
-                    id_list = [self.sow_id.get(),self.pig_id.get()]
-                    self.pig_id_list.append(id_list)
-                    # print(list_to_str(self.pig_id_list))
+                    id_list = [self.sow_id.get(),self.piglet_id.get()]
+                    self.piglet_id_list.append(id_list)
+                    # print(list_to_str(self.piglet_id_list))
 
                     # claculate pig number
                     if self.fence_list[-1].piglet_list is not []:
-                        self.piglet_save_num.set(len(self.fence_list[-1].piglet_list))
+                        self.piglet_save_num.set("已存豬數："+str(len(self.fence_list[-1].piglet_list)))
                         self.fence_list[-1].piglet_num = len(self.fence_list[-1].piglet_list)
 
-                    self.pig_weight.set("小豬重: "+str(round(self.fence_list[-1].piglet_list[-1].weight,2)))
+                    self.piglet_weight.set(str(round(self.fence_list[-1].piglet_list[-1].weight,2))+"kg")
+                    self.pig_weight_show.configure(bg="white",fg="black")
                     self.record_history("儲存成功!")
                     self.record_history("重量："+str(self.fence_list[-1].piglet_list[-1].weight))
+                    self.en_piglet.configure(font=("Calibri",26),width=10, fg="red")
+                    self.piglet_id.set("請輸入耳號")
 
-                    #顯示上頭豬的重量
-                    self.last_piglet_weight.set(round(self.last_ave, 2))
-                    
                     p = Pig()  # create a new pig
                     self.fence_list[-1].piglet_list.append(p)
-                    #self.pig_weight.set("")
+                    
                     
 
                 ##########  Degugging Part  ##########
@@ -516,9 +562,9 @@ class PigGUI(tk.Tk):
                 self.fence_list[-1].weight = total_weight
 
                 #儲存豬耳號
-                # id_list = [self.sow_id.get(),self.pig_id.get()]
-                # self.pig_id_list.append(id_list)
-                # print(li_to_str(self.pig_id_list))
+                # id_list = [self.sow_id.get(),self.piglet_id.get()]
+                # self.piglet_id_list.append(id_list)
+                # print(li_to_str(self.piglet_id_list))
 
                 p = Pig()  # create a new pig
                 self.fence_list[-1].piglet_list.append(p)
@@ -584,9 +630,9 @@ class PigGUI(tk.Tk):
                 self.fence_list[-1].weight = total_weight
 
                 #儲存豬耳號
-                # id_list = [self.sow_id.get(),self.pig_id.get()]
-                # self.pig_id_list.append(id_list)
-                # print(list_to_str(self.pig_id_list))
+                # id_list = [self.sow_id.get(),self.piglet_id.get()]
+                # self.piglet_id_list.append(id_list)
+                # print(list_to_str(self.piglet_id_list))
 
                 p = Pig()  # create a new pig
                 self.fence_list[-1].piglet_list.append(p)
@@ -664,9 +710,9 @@ class PigGUI(tk.Tk):
                 self.fence_list[-1].weight = total_weight
 
                 #儲存豬耳號
-                # id_list = [self.sow_id.get(),self.pig_id.get()]
-                # self.pig_id_list.append(id_list)
-                # print(list_to_str(self.pig_id_list))
+                # id_list = [self.sow_id.get(),self.piglet_id.get()]
+                # self.piglet_id_list.append(id_list)
+                # print(list_to_str(self.piglet_id_list))
 
                 p = Pig()  # create a new pig
                 self.fence_list[-1].piglet_list.append(p)
