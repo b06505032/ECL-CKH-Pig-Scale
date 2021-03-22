@@ -3,8 +3,9 @@ from prettytable import PrettyTable
 import numpy as np
 import pandas as pd
 import csv
-from info import *
+from Structure.DataStructure import Pig, Fence
 from statsmodels.tsa.stattools import kpss
+from Utils.Utils import today
 
 
 
@@ -85,7 +86,7 @@ def analyze_data1(save_var, sample_size, weight_values, file_path, data_filename
 def analyze_data2(save_var, sample_size, weight_values, file_path, data_filename):
     if not weight_values:
         return
-    _datalist, _fencelist, f, ss = [0.0], [], Fence(), sample_size+5
+    _datalist, _fencelist, f, ss = [0.0], [], Fence(), sample_size+10
     _fencelist.append(f)
     total_weight = 0.0
     for i in range(len(weight_values)):
@@ -232,7 +233,7 @@ def analyze_data3(save_var, sample_size, weight_values, file_path, data_filename
 def analyze_data4(save_var, sample_size, weight_values, file_path, data_filename):
     if not weight_values:
         return
-    _datalist, _fencelist, f, ss = [0.0], [], Fence(), sample_size+5
+    _datalist, _fencelist, f, ss = [0.0], [], Fence(), sample_size+10
     _fencelist.append(f)
     total_weight = 0.0
     for i in range(len(weight_values)):
