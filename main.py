@@ -66,18 +66,20 @@ logger = logging.getLogger('info')
 def print(_str):
     logger.debug(_str)
 
-
 def list_to_str(org_list):
     full_str = ', '.join([str(elem) for elem in org_list])
     return full_str
 
 
+
+
 class PigGUI(tk.Tk):
     
     def __init__(self):
-       
         tk.Tk.__init__(self)
         self.title("仔豬磅秤")
+        screenwidth = self.winfo_screenwidth()
+        screenheight = self.winfo_screenheight()
         self.geometry("900x500+200+200")
         self.setting_frame()
         self.weight_frame()
@@ -94,7 +96,6 @@ class PigGUI(tk.Tk):
         self.data_list = [0.0]
         self.fence_list = []
         self.last_ave = 0.0
-        # self.datetime_list = []
         self.pig_id_list = []
         self.record_history("完成初始化")
 
@@ -133,19 +134,22 @@ class PigGUI(tk.Tk):
     def setting_frame(self):
         frm_1 = tk.Frame(self)
         frm_1.place(x=10,y=10)
-        btn_set1 = tk.Button(frm_1,text="設定儲存鎖定值", command=self.save_setting).grid(row=0,column=0)
-        btn_set2 = tk.Button(frm_1,text="秤重資料儲存",command=self.output_csv).grid(row=0,column=1)
-        btn_set3 = tk.Button(frm_1,text="上傳豬隻身分資料",command=self.select_file).grid(row=1,column=0)
-        btn_set4 = tk.Button(frm_1,text="設定資料儲存路徑",command=self.select_folder).grid(row=1,column=1)
+        self.btn_set1 = tk.Button(frm_1,text="設定儲存鎖定值", command=self.save_setting)
+        self.btn_set1.grid(row=0,column=0)
+        self.btn_set2 = tk.Button(frm_1,text="秤重資料儲存",command=self.output_csv)
+        self.btn_set2.grid(row=0,column=1)
+        self.btn_set3 = tk.Button(frm_1,text="上傳豬隻身分資料",command=self.select_file)
+        self.btn_set3.grid(row=1,column=0)
+        self.btn_set4 = tk.Button(frm_1,text="設定資料儲存路徑",command=self.select_folder)
+        self.btn_set4.grid(row=1,column=1)
         self.btn_connect = tk.Button(frm_1,command=self.connecting,text="連線")
         self.btn_connect.grid(row=0,column=2)
-        self.btn_weighing = tk.Button(frm_1,command=self.weighing,text="開始秤重")
+        self.btn_weighing = tk.Button(frm_1,command=self.weighing,text="開始秤重", state = DISABLED)
         self.btn_weighing.grid(row=1,column=2)
         
         port_list = list(serial.tools.list_ports.comports())
         assert (len(port_list) != 0),"无可用串口"
         port_str_list = []
-        
         for i in range(len(port_list)):
             # 将串口号切割出来
             lines = str(port_list[i])
@@ -153,11 +157,16 @@ class PigGUI(tk.Tk):
             str_list = lines.split(" ")
             port_str_list.append(str_list[0])
         self.port_var = tk.StringVar()
-        cbb_com = ttk.Combobox(frm_1,values=port_str_list, textvariable = self.port_var, state="readonly")
+        cbb_com = ttk.Combobox(frm_1,values=port_str_list, textvariable = self.port_var, state="readonly", width=12)
         cbb_com.grid(row=2,column=0)
         
-        cbb_staff = ttk.Combobox(frm_1,values=["小明","阿嬌"])
+        cbb_staff = ttk.Combobox(frm_1,values=["小明","阿嬌"], width=12)
         cbb_staff.grid(row=2,column=1)
+
+        self.ac_rate = tk.IntVar()  # 選擇速率
+        cbb_rate = ttk.Combobox(frm_1,values=[1, 2, 4, 8, 16], textvariable = self.ac_rate, state="readonly", width=12)
+        self.ac_rate.set(1)
+        cbb_rate.grid(row=2,column=2)
     
     def data_frame(self):
         frm_2 = tk.Frame(self)
@@ -180,22 +189,25 @@ class PigGUI(tk.Tk):
         en_sow.grid(row=1,column=0)
         en_smallpig = tk.Entry(frm_2_up, textvariable = self.pig_id)
         en_smallpig.grid(row=1,column=1)
+        
         btn_zero = tk.Button(frm_2_down,text="歸零", command = self.zeroing)
         btn_zero.grid(row=0,column=0)
         btn_clean = tk.Button(frm_2_down,text="清除上筆")
         btn_clean.grid(row=0,column=1)
         
-        
         btn_get_record_data = tk.Button(frm_2_down,text="取得歷史測試資料", command=self.get_record_file)
         btn_get_record_data.grid(row=1,column=0)
-        btn_get_record_data = tk.Button(frm_2_down,text="分析歷史測試資料1", command=self.analyze_data1)
-        btn_get_record_data.grid(row=2,column=0)
-        btn_get_record_data = tk.Button(frm_2_down,text="分析歷史測試資料2", command=self.analyze_data2)
-        btn_get_record_data.grid(row=2,column=1)
-        btn_get_record_data = tk.Button(frm_2_down,text="分析歷史測試資料3", command=self.analyze_data3)
-        btn_get_record_data.grid(row=2,column=2)
-
-
+        btn_analyze_data1 = tk.Button(frm_2_down,text="分析測試資料1", command=self.analyze_data1)
+        btn_analyze_data1.grid(row=2,column=0)
+        Hovertip(btn_analyze_data1, "直接取平均", hover_delay=100)
+        btn_analyze_data2 = tk.Button(frm_2_down,text="分析測試資料2", command=self.analyze_data2)
+        btn_analyze_data2.grid(row=2,column=1)
+        Hovertip(btn_analyze_data2, "前兩筆不計，取平均", hover_delay=100)
+        btn_analyze_data3 = tk.Button(frm_2_down,text="分析測試資料3", command=self.analyze_data3)
+        btn_analyze_data3.grid(row=2,column=2)
+        Hovertip(btn_analyze_data3, "算標準差，刪除異端值，取平均", hover_delay=100)
+       
+        
     def weight_frame(self):
         frm_3 = tk.Frame(self)
         frm_3.place(x=450,y=10)
@@ -277,16 +289,17 @@ class PigGUI(tk.Tk):
 
     def zeroing(self):
         self.myserial.write_data("MZ\r\n")
+        self.weight_var.set(0.0)
         
         
     def connecting(self):
         temp = self.port_var.get()
         try:
             self.myserial.open_port(temp)
-            self.zeroing()
             self.status_var.set("connect")
             self.record_history("連線")
             self.btn_connect.configure(text="中斷連線",command=self.disconnect)
+            self.btn_weighing.configure(state=NORMAL)
         except:
             tk.messagebox.showwarning(title="錯誤",message='請選擇串口埠')
 
@@ -295,20 +308,25 @@ class PigGUI(tk.Tk):
         self.myserial.ser.close()
         self.record_history("中斷連線")
         self.status_var.set("disconnect")
-        self.datafile.close()
         self.btn_connect.configure(text="連線",command=self.connecting)
+        self.btn_weighing.configure(state=DISABLED)
     
     def weighing(self):
         # start reading
-        try:
+        if self.myserial.opened:
+            self.zeroing()
             self.datafile = open(today()+'_'+time()+self.sow_id.get()+'.log',"w")
-            # create a new fence
-            f = Fence()
+            f = Fence() # create a new fence
             self.fence_list.append(f)
             self.label_weighing_nowshow.after(0, self.read_data)
             self.record_history("開始秤重")
             self.btn_weighing.configure(text = "結束並儲存",command=self.stop_weighing)
-        except AttributeError:
+            self.btn_connect.configure(state = DISABLED)
+            self.btn_set1.configure(state = DISABLED)
+            self.btn_set2.configure(state = DISABLED)
+            self.btn_set3.configure(state = DISABLED)
+            self.btn_set4.configure(state = DISABLED)
+        else:
             print("serial is not open!!!!!!!!!!!!")
             tk.messagebox.showwarning(title="錯誤",message='尚未連線!!!!!!!!')
 
@@ -316,9 +334,14 @@ class PigGUI(tk.Tk):
         self.label_weighing_nowshow.after_cancel(self.weight_value_show)
         self.record_history("停止秤重")
         self.btn_weighing.configure(text = "開始秤重",command=self.weighing)
-        self.output_csv()
+        self.btn_connect.configure(state = NORMAL)
+        self.btn_set1.configure(state = NORMAL)
+        self.btn_set2.configure(state = NORMAL)
+        self.btn_set3.configure(state = NORMAL)
+        self.btn_set4.configure(state = NORMAL)
         self.datafile.close()
-
+        self.output_csv()
+        
 
     def output_csv(self):
         file_path = self.storage_path_var.get()
@@ -337,7 +360,6 @@ class PigGUI(tk.Tk):
                     k = k + 1
                 temp1 = ["", "", "total", self.fence_list[j].weight]
                 write.writerow(temp1)
-
 
 
     def read_data(self):  #讀取資料
@@ -366,9 +388,6 @@ class PigGUI(tk.Tk):
                 self.datafile.write(time()+" "+str(data)+"\n")
                 self.weight_var.set(data)
                 self.data_list.append(data)
-                #self.datetime_list.append(time())
-                # print("data list: "+ list_to_str(self.data_list))
-                
 
                 ##########  Algorithms Part  ##########
                 # print("total_weight_var: " + str(self.total_weight_var.get()))
@@ -387,16 +406,16 @@ class PigGUI(tk.Tk):
                         
                 
                 # claculate the average
-                if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= 20:
+                if(len(self.fence_list[-1].piglet_list[-1].weight_list)) >= 32:
                     temp_list = list(self.fence_list[-1].piglet_list[-1].weight_list)
-                    print("\nrecord weight: " + list_to_str(temp_list))
+                    # print("record weight: " + list_to_str(temp_list))
                     for i in range(len(temp_list)):
                         temp_list[i] -= self.total_weight_var.get()
-                    print("calculate weight: "+ list_to_str(temp_list))
+                    # print("calculate weight: "+ list_to_str(temp_list))
                     self.last_ave = round(mean(temp_list),2)
                     self.fence_list[-1].piglet_list[-1].weight = self.last_ave
                     self.total_weight_var.set(self.total_weight_var.get()+self.last_ave)
-                    print("average weight: " + str(self.last_ave))
+                    # print("average weight: " + str(self.last_ave))
                     self.fence_list[-1].weight = self.total_weight_var.get()
 
                     #儲存豬耳號
@@ -404,10 +423,10 @@ class PigGUI(tk.Tk):
                     self.pig_id_list.append(id_list)
                     # print(list_to_str(self.pig_id_list))
 
-
                     # claculate pig number
                     if self.fence_list[-1].piglet_list is not []:
                         self.piglet_save_num.set(len(self.fence_list[-1].piglet_list))
+                        self.fence_list[-1].piglet_num = len(self.fence_list[-1].piglet_list)
 
                     self.pig_weight.set("小豬重: "+str(round(self.fence_list[-1].piglet_list[-1].weight,2)))
                     self.record_history("儲存成功!")
@@ -416,13 +435,10 @@ class PigGUI(tk.Tk):
                     #顯示上頭豬的重量
                     self.last_piglet_weight.set(round(self.last_ave, 2))
                     
-
                     p = Pig()  # create a new pig
                     self.fence_list[-1].piglet_list.append(p)
-                    self.fence_list[-1].piglet_num = len(self.fence_list[-1].piglet_list) -1
                     #self.pig_weight.set("")
                     
-
 
                 ##########  Degugging Part  ##########
                 print("Total Fence num: {}".format(len(self.fence_list)))
@@ -432,7 +448,18 @@ class PigGUI(tk.Tk):
                         print("No. "+ str(i+1)+ " pig weight: " + list_to_str(self.fence_list[j].piglet_list[i].weight_list))
                 ##########  Debugging Part  ##########
 
-            self.weight_value_show = self.label_weighing_nowshow.after(250,self.read_data)
+            t = 1000
+            if self.ac_rate.get() == 1:
+                t = 1000
+            elif self.ac_rate.get() == 2:
+                t = 500
+            elif self.ac_rate.get() == 4:
+                t = 250
+            elif self.ac_rate.get() == 8:
+                t = 125
+            elif self.ac_rate.get() == 16:
+                t = 62
+            self.weight_value_show = self.label_weighing_nowshow.after(250, self.read_data)
             
         else:
             print("serial is not open")
@@ -499,7 +526,7 @@ class PigGUI(tk.Tk):
             
         print("analyze method 1  取10筆data, 直接算平均")
         x = PrettyTable()
-        x.field_names = ["pig","1", "2", "3", "4","5","6","7","8","9","10","weight"]
+        x.field_names = ["pig","1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "weight"]
         for j in range(len(self.fence_list)):
             temp = ["No.",j+1,"Fence","","","","","","","","",""]
             x.add_row(temp)
@@ -676,7 +703,6 @@ class PigGUI(tk.Tk):
         print(x)
 
 
-
     def save_setting(self):
         temp = self.save_var.get()
         user_input = sd.askfloat("設定儲存鎖定值", "請輸入儲存鎖定值")
@@ -709,22 +735,20 @@ class PigGUI(tk.Tk):
 class mySerialPort:
     def __init__(self, _buadrates):
         self.BAUD_RATES = _buadrates    # 設定傳輸速率
-        
+        self.opened = False
     
     def open_port(self, _comport):  #打開串口埠
         self.ser = serial.Serial(_comport, self.BAUD_RATES)   # 初始化序列通訊埠
+        self.opened = True
         print("open!\n")
-    
     
     def write_data(self, info):  #寫入資料
         try:
             if self.ser.is_open == True:
                 print(str(info))
                 self.ser.write(info.encode("utf-8"))
-
             else:
                 print("錯誤")
-        
         except KeyboardInterrupt:
             self.ser.close()    # 清除序列通訊物件
             print('再見！')
@@ -748,6 +772,115 @@ class Fence():
         self.piglet_list = []
         p = Pig()
         self.piglet_list.append(p)
+
+
+"""
+Tools for displaying tool-tips.
+ref: https://github.com/python/cpython/blob/master/Lib/idlelib/tooltip.py
+"""
+class TooltipBase(object):
+    def __init__(self, anchor_widget):
+        self.anchor_widget = anchor_widget
+        self.tipwindow = None
+
+    def __del__(self):
+        self.hidetip()
+
+    def showtip(self):
+        if self.tipwindow:
+            return
+        self.tipwindow = tw = Toplevel(self.anchor_widget)
+        tw.wm_overrideredirect(1)
+        try:
+            # This command is only needed and available on Tk >= 8.4.0 for OSX.
+            # Without it, call tips intrude on the typing process by grabbing
+            # the focus.
+            tw.tk.call("::tk::unsupported::MacWindowStyle", "style", tw._w,
+                       "help", "noActivates")
+        except TclError:
+            pass
+
+        self.position_window()
+        self.showcontents()
+        self.tipwindow.update_idletasks()  # Needed on MacOS -- see #34275.
+        self.tipwindow.lift()  # work around bug in Tk 8.5.18+ (issue #24570)
+
+    def position_window(self):
+        x, y = self.get_position()
+        root_x = self.anchor_widget.winfo_rootx() + x
+        root_y = self.anchor_widget.winfo_rooty() + y
+        self.tipwindow.wm_geometry("+%d+%d" % (root_x, root_y))
+
+    def get_position(self):
+        """choose a screen position for the tooltip"""
+        return 20, self.anchor_widget.winfo_height() + 1
+
+    def showcontents(self):
+        raise NotImplementedError
+
+    def hidetip(self):
+        tw = self.tipwindow
+        self.tipwindow = None
+        if tw:
+            try:
+                tw.destroy()
+            except TclError:  # pragma: no cover
+                pass
+
+class OnHoverTooltipBase(TooltipBase):
+    def __init__(self, anchor_widget, hover_delay=1000):
+        super(OnHoverTooltipBase, self).__init__(anchor_widget)
+        self.hover_delay = hover_delay
+
+        self._after_id = None
+        self._id1 = self.anchor_widget.bind("<Enter>", self._show_event)
+        self._id2 = self.anchor_widget.bind("<Leave>", self._hide_event)
+        self._id3 = self.anchor_widget.bind("<Button>", self._hide_event)
+
+    def __del__(self):
+        try:
+            self.anchor_widget.unbind("<Enter>", self._id1)
+            self.anchor_widget.unbind("<Leave>", self._id2)  # pragma: no cover
+            self.anchor_widget.unbind("<Button>", self._id3) # pragma: no cover
+        except TclError:
+            pass
+        super(OnHoverTooltipBase, self).__del__()
+
+    def _show_event(self, event=None):
+        if self.hover_delay:
+            self.schedule()
+        else:
+            self.showtip()
+
+    def _hide_event(self, event=None):
+        self.hidetip()
+
+    def schedule(self):
+        self.unschedule()
+        self._after_id = self.anchor_widget.after(self.hover_delay,self.showtip)
+
+    def unschedule(self):
+        after_id = self._after_id
+        self._after_id = None
+        if after_id:
+            self.anchor_widget.after_cancel(after_id)
+
+    def hidetip(self):
+        try:
+            self.unschedule()
+        except TclError:  # pragma: no cover
+            pass
+        super(OnHoverTooltipBase, self).hidetip()
+
+class Hovertip(OnHoverTooltipBase):
+    def __init__(self, anchor_widget, text, hover_delay=1000):
+        super(Hovertip, self).__init__(anchor_widget, hover_delay=hover_delay)
+        self.text = text
+
+    def showcontents(self):
+        label = Label(self.tipwindow, text=self.text, justify=LEFT,
+                    background="#ffffe0", relief=SOLID, borderwidth=1)
+        label.pack()
 
 
 
