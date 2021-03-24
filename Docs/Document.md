@@ -73,5 +73,5 @@
 2. time data （時間-重量記錄檔）(每新增一個fence，新建一份log) 
 
 ## 操作方式-讀取資料做事後分析
-- 範例資料檔案: Repo/Doc/1202fence1.log
+- 範例資料檔案: Repo/Doc/1202fence1.log
 - 此 [文件](AnalyzeDataManual.md)  說明如何做資料分析
