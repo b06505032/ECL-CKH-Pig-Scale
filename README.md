@@ -6,8 +6,10 @@
     ```
     # get to the directory of this repository
     $ cd <repository_name>
+    
     # create a virtual environment
     $ python3 -m venv <env_name>
+    
     # activate the virtual environment
     $ source <env_name>/bin/activate
     ```
