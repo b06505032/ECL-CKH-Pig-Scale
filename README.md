@@ -41,5 +41,10 @@ $ python3 main.py
 │   ├── StartView.py
 │   ├── ScaleView.py
 │   └── AnalyzeView.py
+├── Docs
+│   ├── 1202fence1.log
+│   ├── AnalyzeDataManual.md
+│   ├── Document.md
+│   └── Pig_Scale_report2.0.pdf
 └── .gitignore
 ```
