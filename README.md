@@ -4,13 +4,16 @@
 - python3 version: 3.9.1
 - Create a virtual environment and activate it
     ```
+    # get to the directory of this repository
     $ cd <repository_name>
+    # create a virtual environment
     $ python3 -m venv <env_name>
+    # activate the virtual environment
     $ source <env_name>/bin/activate
     ```
 - Install required package
     ```
-    pip3 install -r requirements.txt
+    $ pip3 install -r requirements.txt
     ```
 
 ## Run the code
@@ -19,7 +22,7 @@ $ python3 main.py
 ```
 
 ## Reference
-- The [Document](Docs/Document.md) you may have to read
+- Here is the [Document](Docs/Document.md) you may have to read to know the structure of the program.
 
 
 ## Repo Structure
